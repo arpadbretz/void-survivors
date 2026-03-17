@@ -208,6 +208,9 @@ export default function PlayPage() {
   const [dailyResult, setDailyResult] = useState<import("@/game/daily").DailyResult | null>(null);
   const [isDailyMode, setIsDailyMode] = useState(false);
 
+  // Stats tab state
+  const [statsTab, setStatsTab] = useState<"overview" | "history">("overview");
+
   // Difficulty state
   const [selectedDifficulty, setSelectedDifficulty] = useState<import("@/game/difficulty").Difficulty>("normal");
   const [difficultyConfigs, setDifficultyConfigs] = useState<Record<string, import("@/game/difficulty").DifficultyConfig> | null>(null);
@@ -435,6 +438,18 @@ export default function PlayPage() {
       });
       statsMod.saveLifetimeStats(updated);
       setLifetimeStats(updated);
+
+      // Save run record for history
+      statsMod.saveRunRecord({
+        date: new Date().toISOString(),
+        score: stats.score,
+        wave: stats.wavesSurvived,
+        kills: stats.enemiesKilled,
+        time: stats.timeSurvived,
+        level: stats.level,
+        difficulty: isDailyMode ? "daily" : selectedDifficulty,
+        character: selectedCharacter,
+      });
 
       // Check achievements
       if (achievementManagerRef.current) {
@@ -1703,11 +1718,12 @@ export default function PlayPage() {
             zIndex: 20,
             background: "rgba(0,0,0,0.9)",
             fontFamily: "var(--font-geist-mono), monospace",
+            overflow: "auto",
           }}
         >
-          <div style={{ width: "100%", maxWidth: 500, padding: "40px 20px" }}>
+          <div style={{ width: "100%", maxWidth: 560, padding: "40px 20px" }}>
             {/* Header */}
-            <div style={{ textAlign: "center", marginBottom: 32 }}>
+            <div style={{ textAlign: "center", marginBottom: 24 }}>
               <h2
                 style={{
                   fontSize: "2rem",
@@ -1722,7 +1738,39 @@ export default function PlayPage() {
               </h2>
             </div>
 
-            {/* Stat Rows */}
+            {/* Tab Buttons */}
+            <div style={{ display: "flex", gap: 0, marginBottom: 24, borderBottom: "1px solid rgba(0,238,255,0.15)" }}>
+              {(["overview", "history"] as const).map((tab) => {
+                const isActive = statsTab === tab;
+                return (
+                  <button
+                    key={tab}
+                    onClick={() => setStatsTab(tab)}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      borderBottom: isActive ? "2px solid #00eeff" : "2px solid transparent",
+                      color: isActive ? "#00eeff" : "rgba(224,224,240,0.4)",
+                      padding: "8px 24px",
+                      cursor: "pointer",
+                      fontSize: "0.9rem",
+                      fontFamily: "inherit",
+                      fontWeight: isActive ? 700 : 400,
+                      letterSpacing: "0.08em",
+                      textTransform: "uppercase",
+                      transition: "all 0.2s",
+                    }}
+                    onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.color = "rgba(224,224,240,0.7)"; }}
+                    onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.color = "rgba(224,224,240,0.4)"; }}
+                  >
+                    {tab === "overview" ? "Overview" : "Run History"}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Overview Tab */}
+            {statsTab === "overview" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {(() => {
                 const s = lifetimeStats || {
@@ -1780,11 +1828,202 @@ export default function PlayPage() {
                 ));
               })()}
             </div>
+            )}
+
+            {/* Run History Tab */}
+            {statsTab === "history" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+              {(() => {
+                let runHistory: import("@/game/stats").RunRecord[] = [];
+                try {
+                  const raw = localStorage.getItem("void-survivors-run-history");
+                  if (raw) {
+                    const parsed = JSON.parse(raw);
+                    if (Array.isArray(parsed)) runHistory = parsed.slice(-20);
+                  }
+                } catch { /* ignore */ }
+
+                if (runHistory.length === 0) {
+                  return (
+                    <div style={{ textAlign: "center", padding: "60px 20px", color: "rgba(224,224,240,0.4)" }}>
+                      <div style={{ fontSize: "2rem", marginBottom: 12 }}>{"\u{1F4CA}"}</div>
+                      <div style={{ fontSize: "0.9rem" }}>No runs recorded yet.</div>
+                      <div style={{ fontSize: "0.8rem", marginTop: 8 }}>Complete a run to see your history here.</div>
+                    </div>
+                  );
+                }
+
+                const maxScore = Math.max(...runHistory.map(r => r.score), 1);
+                const difficultyColor = (d: string) => {
+                  switch (d.toLowerCase()) {
+                    case "easy": return "#44ff44";
+                    case "normal": return "#00eeff";
+                    case "hard": return "#ff8800";
+                    case "nightmare": return "#ff3344";
+                    default: return "#aa66ff";
+                  }
+                };
+                const gridLines = [0.25, 0.5, 0.75];
+                const chartHeight = 160;
+                const last5 = runHistory.slice(-5).reverse();
+                const fmtTime = (t: number) => {
+                  const m = Math.floor(t / 60);
+                  const s = Math.floor(t % 60);
+                  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+                };
+
+                return (
+                  <>
+                    {/* Score Chart */}
+                    <div
+                      style={{
+                        background: "rgba(0,0,0,0.5)",
+                        border: "1px solid rgba(0,238,255,0.12)",
+                        borderRadius: 8,
+                        padding: "16px 16px 8px",
+                      }}
+                    >
+                      <div style={{ fontSize: "0.75rem", color: "rgba(224,224,240,0.4)", marginBottom: 8, letterSpacing: "0.05em" }}>
+                        SCORE HISTORY (LAST {runHistory.length} RUNS)
+                      </div>
+                      {/* Y-axis max label */}
+                      <div style={{ fontSize: "0.65rem", color: "rgba(0,238,255,0.35)", marginBottom: 2, textAlign: "right" }}>
+                        {maxScore.toLocaleString()}
+                      </div>
+                      <div
+                        style={{
+                          position: "relative",
+                          height: chartHeight,
+                          display: "flex",
+                          alignItems: "flex-end",
+                          gap: 2,
+                          padding: "0 2px",
+                        }}
+                      >
+                        {/* Gridlines */}
+                        {gridLines.map((pct) => (
+                          <div
+                            key={pct}
+                            style={{
+                              position: "absolute",
+                              left: 0,
+                              right: 0,
+                              bottom: `${pct * 100}%`,
+                              height: 1,
+                              background: "rgba(0,238,255,0.08)",
+                              pointerEvents: "none",
+                            }}
+                          />
+                        ))}
+                        {/* Bars */}
+                        {runHistory.map((run, i) => {
+                          const heightPct = (run.score / maxScore) * 100;
+                          const color = difficultyColor(run.difficulty);
+                          return (
+                            <div
+                              key={i}
+                              style={{
+                                flex: 1,
+                                display: "flex",
+                                justifyContent: "center",
+                                alignItems: "flex-end",
+                                height: "100%",
+                                position: "relative",
+                              }}
+                              title={`Run #${i + 1}: ${run.score.toLocaleString()} pts | Wave ${run.wave} | ${run.difficulty}`}
+                            >
+                              <div
+                                style={{
+                                  width: 8,
+                                  height: `${Math.max(heightPct, 2)}%`,
+                                  background: color,
+                                  borderRadius: "4px 4px 0 0",
+                                  opacity: 0.85,
+                                  transition: "height 0.3s ease",
+                                  boxShadow: `0 0 4px ${color}40`,
+                                }}
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {/* X-axis labels */}
+                      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4, padding: "0 2px" }}>
+                        <span style={{ fontSize: "0.6rem", color: "rgba(224,224,240,0.25)" }}>1</span>
+                        <span style={{ fontSize: "0.6rem", color: "rgba(224,224,240,0.25)" }}>{runHistory.length}</span>
+                      </div>
+                      {/* Legend */}
+                      <div style={{ display: "flex", gap: 12, marginTop: 8, justifyContent: "center", flexWrap: "wrap" }}>
+                        {[["Easy", "#44ff44"], ["Normal", "#00eeff"], ["Hard", "#ff8800"], ["Nightmare", "#ff3344"]].map(([label, c]) => (
+                          <div key={label} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                            <div style={{ width: 6, height: 6, borderRadius: "50%", background: c as string }} />
+                            <span style={{ fontSize: "0.6rem", color: "rgba(224,224,240,0.35)" }}>{label}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Recent Runs Table */}
+                    <div
+                      style={{
+                        background: "rgba(0,0,0,0.5)",
+                        border: "1px solid rgba(0,238,255,0.12)",
+                        borderRadius: 8,
+                        padding: 16,
+                      }}
+                    >
+                      <div style={{ fontSize: "0.75rem", color: "rgba(224,224,240,0.4)", marginBottom: 12, letterSpacing: "0.05em" }}>
+                        RECENT RUNS
+                      </div>
+                      <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "var(--font-geist-mono), monospace", fontSize: "0.75rem" }}>
+                        <thead>
+                          <tr style={{ borderBottom: "1px solid rgba(0,238,255,0.1)" }}>
+                            {["#", "Score", "Wave", "Kills", "Time", "Difficulty"].map((h) => (
+                              <th
+                                key={h}
+                                style={{
+                                  textAlign: h === "#" || h === "Score" || h === "Wave" || h === "Kills" ? "right" : "left",
+                                  padding: "6px 8px",
+                                  color: "rgba(224,224,240,0.35)",
+                                  fontWeight: 500,
+                                  letterSpacing: "0.05em",
+                                }}
+                              >
+                                {h}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {last5.map((run, idx) => {
+                            const runNum = runHistory.length - idx;
+                            return (
+                              <tr key={idx} style={{ borderBottom: "1px solid rgba(0,238,255,0.05)" }}>
+                                <td style={{ padding: "6px 8px", color: "rgba(224,224,240,0.3)", textAlign: "right" }}>{runNum}</td>
+                                <td style={{ padding: "6px 8px", color: "#00eeff", fontWeight: 600, textAlign: "right" }}>{run.score.toLocaleString()}</td>
+                                <td style={{ padding: "6px 8px", color: "rgba(224,224,240,0.6)", textAlign: "right" }}>{run.wave}</td>
+                                <td style={{ padding: "6px 8px", color: "rgba(224,224,240,0.6)", textAlign: "right" }}>{run.kills}</td>
+                                <td style={{ padding: "6px 8px", color: "rgba(224,224,240,0.6)", textAlign: "left" }}>{fmtTime(run.time)}</td>
+                                <td style={{ padding: "6px 8px", color: difficultyColor(run.difficulty), textAlign: "left", textTransform: "capitalize" }}>{run.difficulty}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+            )}
 
             {/* Back Button */}
             <div style={{ textAlign: "center", marginTop: 36 }}>
               <button
-                onClick={() => setScreen("menu")}
+                onClick={() => {
+                  setStatsTab("overview");
+                  setScreen("menu");
+                }}
                 style={{
                   background: "none",
                   border: "1px solid rgba(0,238,255,0.3)",

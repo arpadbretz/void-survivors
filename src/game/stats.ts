@@ -19,7 +19,20 @@ export interface LifetimeStats {
   phantomKills: number;
 }
 
+export interface RunRecord {
+  date: string;        // ISO date
+  score: number;
+  wave: number;
+  kills: number;
+  time: number;        // seconds survived
+  level: number;
+  difficulty: string;
+  character: string;
+}
+
 const STATS_KEY = 'void-survivors-stats';
+const RUN_HISTORY_KEY = 'void-survivors-run-history';
+const MAX_RUN_HISTORY = 20;
 
 const DEFAULT_STATS: LifetimeStats = {
   gamesPlayed: 0,
@@ -52,6 +65,30 @@ export function loadLifetimeStats(): LifetimeStats {
 export function saveLifetimeStats(stats: LifetimeStats): void {
   try {
     localStorage.setItem(STATS_KEY, JSON.stringify(stats));
+  } catch {
+    // ignore
+  }
+}
+
+export function loadRunHistory(): RunRecord[] {
+  try {
+    const raw = localStorage.getItem(RUN_HISTORY_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.slice(-MAX_RUN_HISTORY);
+  } catch {
+    return [];
+  }
+}
+
+export function saveRunRecord(record: RunRecord): void {
+  try {
+    const history = loadRunHistory();
+    history.push(record);
+    // Keep only the last 20 runs
+    const trimmed = history.slice(-MAX_RUN_HISTORY);
+    localStorage.setItem(RUN_HISTORY_KEY, JSON.stringify(trimmed));
   } catch {
     // ignore
   }
