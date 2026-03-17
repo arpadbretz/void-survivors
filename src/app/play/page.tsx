@@ -15,6 +15,7 @@ interface HUDState {
   xp: number;
   xpToNext: number;
   time: number;
+  paused: boolean;
   abilities: { icon: string; name: string; level: number; color: string }[];
 }
 
@@ -26,7 +27,7 @@ interface GameOverStats {
   wavesSurvived: number;
 }
 
-type GameScreen = "menu" | "playing" | "upgrade" | "gameover";
+type GameScreen = "menu" | "playing" | "paused" | "upgrade" | "gameover";
 
 interface HighScoreEntry {
   score: number;
@@ -122,6 +123,7 @@ export default function PlayPage() {
     xp: 0,
     xpToNext: 100,
     time: 0,
+    paused: false,
     abilities: [],
   });
   const [upgradeChoices, setUpgradeChoices] = useState<UpgradeChoice[]>([]);
@@ -181,6 +183,11 @@ export default function PlayPage() {
   // -----------------------------------------------------------------------
   const handleStateChange = useCallback((state: HUDState) => {
     setHud(state);
+    if (state.paused) {
+      setScreen((prev) => (prev === "playing" ? "paused" : prev));
+    } else {
+      setScreen((prev) => (prev === "paused" ? "playing" : prev));
+    }
   }, []);
 
   const handleLevelUp = useCallback((choices: UpgradeChoice[]) => {
@@ -269,6 +276,11 @@ export default function PlayPage() {
     });
     setScreen("playing");
   }, [handleStateChange, handleLevelUp, handleGameOver]);
+
+  const resumeGame = useCallback(() => {
+    engineRef.current?.resume();
+    setScreen("playing");
+  }, []);
 
   const backToMenu = useCallback(() => {
     engineRef.current?.cleanup();
@@ -464,7 +476,7 @@ export default function PlayPage() {
       )}
 
       {/* ============== In-Game HUD ============== */}
-      {screen === "playing" && (
+      {(screen === "playing" || screen === "paused") && (
         <div
           style={{
             position: "absolute",
@@ -764,6 +776,101 @@ export default function PlayPage() {
         </div>
       )}
 
+      {/* ============== Pause Menu Overlay ============== */}
+      {screen === "paused" && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 30,
+            background: "rgba(10, 10, 18, 0.75)",
+            backdropFilter: "blur(6px)",
+          }}
+        >
+          <div className="animate-scale-in" style={{ textAlign: "center" }}>
+            <h2
+              style={{
+                fontSize: "clamp(2.5rem, 6vw, 4rem)",
+                fontWeight: 900,
+                color: "#00f0ff",
+                letterSpacing: "0.15em",
+                marginBottom: 48,
+                textShadow: `
+                  0 0 10px #00f0ff,
+                  0 0 30px #00f0ff,
+                  0 0 60px rgba(0,240,255,0.4)
+                `,
+              }}
+            >
+              PAUSED
+            </h2>
+
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 14,
+                alignItems: "center",
+              }}
+            >
+              <button
+                className="btn-neon-filled"
+                onClick={resumeGame}
+                style={{ fontSize: "1.2rem", padding: "14px 56px", minWidth: 220 }}
+              >
+                RESUME
+              </button>
+              <button
+                className="btn-neon"
+                onClick={restartGame}
+                style={{ fontSize: "1rem", padding: "12px 48px", minWidth: 220 }}
+              >
+                RESTART
+              </button>
+              <button
+                className="btn-neon"
+                onClick={backToMenu}
+                style={{ fontSize: "1rem", padding: "12px 48px", minWidth: 220 }}
+              >
+                MAIN MENU
+              </button>
+              <button
+                onClick={toggleSound}
+                style={{
+                  marginTop: 8,
+                  background: "rgba(255,255,255,0.05)",
+                  border: "1px solid rgba(255,255,255,0.15)",
+                  borderRadius: 8,
+                  color: "rgba(224, 224, 240, 0.6)",
+                  padding: "10px 24px",
+                  cursor: "pointer",
+                  fontSize: "0.9rem",
+                  minWidth: 220,
+                  backdropFilter: "blur(4px)",
+                }}
+              >
+                {soundEnabled ? "\u{1F50A} Sound On" : "\u{1F507} Sound Off"}
+              </button>
+            </div>
+
+            <p
+              style={{
+                color: "rgba(224, 224, 240, 0.3)",
+                fontSize: "0.8rem",
+                marginTop: 32,
+                letterSpacing: "0.08em",
+              }}
+            >
+              Press ESC to resume
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* ============== Game Over Overlay ============== */}
       {screen === "gameover" && gameOverStats && (
         <div
@@ -863,6 +970,103 @@ export default function PlayPage() {
                 {gameOverStats.wavesSurvived}
               </span>
             </div>
+
+            {/* High Scores */}
+            {highScores.length > 0 && (
+              <div
+                className="glass"
+                style={{
+                  marginTop: 24,
+                  padding: "16px 28px",
+                  borderRadius: 12,
+                  display: "inline-block",
+                }}
+              >
+                <h3
+                  style={{
+                    color: "#ffd700",
+                    fontSize: "0.85rem",
+                    fontWeight: 700,
+                    letterSpacing: "0.15em",
+                    marginBottom: 12,
+                    textShadow: "0 0 8px rgba(255,215,0,0.4)",
+                  }}
+                >
+                  HIGH SCORES
+                </h3>
+                <table
+                  style={{
+                    borderCollapse: "collapse",
+                    width: "100%",
+                    fontFamily: "var(--font-geist-mono), monospace",
+                    fontSize: "0.8rem",
+                  }}
+                >
+                  <thead>
+                    <tr
+                      style={{
+                        color: "rgba(224,224,240,0.4)",
+                        fontSize: "0.7rem",
+                        letterSpacing: "0.1em",
+                      }}
+                    >
+                      <th style={{ padding: "2px 8px", textAlign: "left" }}>#</th>
+                      <th style={{ padding: "2px 8px", textAlign: "right" }}>SCORE</th>
+                      <th style={{ padding: "2px 8px", textAlign: "right" }}>LVL</th>
+                      <th style={{ padding: "2px 8px", textAlign: "right" }}>TIME</th>
+                      <th style={{ padding: "2px 8px", textAlign: "left" }}></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {highScores.map((entry, i) => {
+                      const isNew = i === newHighScoreRank;
+                      return (
+                        <tr
+                          key={i}
+                          style={{
+                            color: isNew ? "#ffd700" : "rgba(224,224,240,0.7)",
+                          }}
+                        >
+                          <td style={{ padding: "3px 8px", textAlign: "left" }}>
+                            {i + 1}
+                          </td>
+                          <td
+                            style={{
+                              padding: "3px 8px",
+                              textAlign: "right",
+                              color: isNew ? "#ffd700" : "#00f0ff",
+                            }}
+                          >
+                            {entry.score.toLocaleString()}
+                          </td>
+                          <td style={{ padding: "3px 8px", textAlign: "right" }}>
+                            {entry.level}
+                          </td>
+                          <td style={{ padding: "3px 8px", textAlign: "right" }}>
+                            {formatTime(entry.time)}
+                          </td>
+                          <td style={{ padding: "3px 8px", textAlign: "left" }}>
+                            {isNew && (
+                              <span
+                                style={{
+                                  color: "#ffd700",
+                                  fontSize: "0.65rem",
+                                  fontWeight: 800,
+                                  letterSpacing: "0.05em",
+                                  textShadow: "0 0 6px rgba(255,215,0,0.6)",
+                                }}
+                              >
+                                NEW!
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
 
             <div
               style={{

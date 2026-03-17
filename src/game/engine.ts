@@ -32,6 +32,7 @@ import {
   applyUpgradeChoice,
   getAbilityDescription,
   createStarterAbility,
+  createAutoCannonAbility,
 } from './abilities';
 import { AudioManager } from './audio';
 
@@ -55,6 +56,7 @@ interface EngineCallbacks {
     xp: number;
     xpToNext: number;
     time: number;
+    paused: boolean;
     abilities: { icon: string; name: string; level: number; color: string }[];
   }) => void;
   onLevelUp: (
@@ -132,6 +134,7 @@ export class GameEngine {
     this.audio.init();
     if (!this.soundEnabled) this.audio.mute();
     else this.audio.unmute();
+    this.audio.startMusic();
 
     this.initState();
     this.attachListeners();
@@ -142,6 +145,7 @@ export class GameEngine {
 
   cleanup(): void {
     this.running = false;
+    this.audio.stopMusic();
     if (this.animationFrameId !== null) {
       cancelAnimationFrame(this.animationFrameId);
       this.animationFrameId = null;
@@ -230,8 +234,9 @@ export class GameEngine {
       lastDamageTime: 0,
     };
 
-    // Give player a starting ability
+    // Give player starting abilities
     player.abilities.push(createStarterAbility());
+    player.abilities.push(createAutoCannonAbility());
 
     const camera: Camera = {
       x: center,
@@ -422,12 +427,15 @@ export class GameEngine {
       s.xpOrbs = s.xpOrbs.slice(-100);
     }
 
-    // 14. Game over
+    // 14. Pass kill count to state for renderer
+    s.enemiesKilled = this.enemiesKilled;
+
+    // 15. Game over
     if (s.player.health <= 0 && !s.gameOver) {
       this.triggerGameOver();
     }
 
-    // 15. Push HUD state to React (throttled)
+    // 16. Push HUD state to React (throttled)
     if (s.time - this.lastHudUpdate >= HUD_UPDATE_INTERVAL) {
       this.lastHudUpdate = s.time;
       this.pushHudState();
@@ -463,6 +471,11 @@ export class GameEngine {
 
     if (dx !== 0 || dy !== 0) {
       this.particles.emitTrail(p.pos.x, p.pos.y, '#00aacc');
+    }
+
+    // Passive health regeneration: 1 HP per 3 seconds
+    if (p.health < p.maxHealth) {
+      p.health = Math.min(p.maxHealth, p.health + (1 / 3) * dt);
     }
   }
 
@@ -631,13 +644,20 @@ export class GameEngine {
       this.state.screenShake = 15;
     }
 
-    this.state.xpOrbs.push({
-      pos: { x: enemy.pos.x, y: enemy.pos.y },
-      value: enemy.xpValue,
-      radius: 6,
-      magnetRadius: BASE_MAGNET_RANGE,
-      active: true,
-    });
+    // Spawn 2-3 XP orbs spread around the death position
+    const orbCount = 2 + Math.floor(Math.random() * 2); // 2 or 3
+    const orbValue = Math.max(1, Math.floor(enemy.xpValue / orbCount));
+    for (let i = 0; i < orbCount; i++) {
+      const spreadX = enemy.pos.x + (Math.random() - 0.5) * 20;
+      const spreadY = enemy.pos.y + (Math.random() - 0.5) * 20;
+      this.state.xpOrbs.push({
+        pos: { x: spreadX, y: spreadY },
+        value: i === 0 ? enemy.xpValue - orbValue * (orbCount - 1) : orbValue,
+        radius: 6,
+        magnetRadius: BASE_MAGNET_RANGE,
+        active: true,
+      });
+    }
   }
 
   // ── Level Up ──────────────────────────────────────────────────
@@ -687,6 +707,8 @@ export class GameEngine {
     const expectedWave = Math.floor(this.state.time / WAVE_DURATION) + 1;
     if (expectedWave > this.state.wave) {
       this.state.wave = expectedWave;
+      this.renderer?.announceWave(expectedWave);
+      this.audio.setMusicIntensity(this.state.wave / 10);
     }
   }
 
@@ -748,6 +770,19 @@ export class GameEngine {
     if (s.screenShake > 1) {
       r.drawScreenFlash(s.screenShake / 15, '#ff3344');
     }
+
+    // Canvas HUD overlay
+    r.drawHUD(s, WORLD_SIZE);
+
+    // Upgrade screen
+    if (s.showUpgradeScreen && s.upgradeChoices.length > 0) {
+      r.drawUpgradeScreen(s.upgradeChoices, s.time);
+    }
+
+    // Game over screen
+    if (s.gameOver) {
+      r.drawGameOver(s);
+    }
   }
 
   // ── Push HUD State to React ───────────────────────────────────
@@ -765,6 +800,7 @@ export class GameEngine {
       xp: p.xp,
       xpToNext: this.xpForLevel(p.level),
       time: this.state.time,
+      paused: this.state.paused,
       abilities: p.abilities.map((a) => ({
         icon: a.icon,
         name: a.name,
@@ -778,6 +814,7 @@ export class GameEngine {
 
   private triggerGameOver(): void {
     this.state.gameOver = true;
+    this.audio.stopMusic();
     this.audio.playGameOver();
     this.particles.emitExplosion(
       this.state.player.pos.x,
@@ -866,6 +903,7 @@ export class GameEngine {
       case 'Escape':
         if (this.state.showUpgradeScreen) return;
         this.state.paused = !this.state.paused;
+        this.pushHudState();
         break;
       case 'Digit1':
         this.selectUpgrade(0);

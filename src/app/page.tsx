@@ -261,6 +261,18 @@ export default function HomePage() {
           >
             How to Play
           </a>
+          <a
+            href="#controls"
+            style={{
+              color: "rgba(224,224,240,0.5)",
+              textDecoration: "none",
+              fontSize: "0.9rem",
+              letterSpacing: "0.05em",
+              transition: "color 0.2s",
+            }}
+          >
+            Controls
+          </a>
           <Link
             href="/play"
             className="btn-neon"
@@ -460,6 +472,200 @@ export default function HomePage() {
             icon={"⬆️"}
             text="Level up and choose powerful upgrades to survive longer"
           />
+        </div>
+      </section>
+
+      {/* ===================== Keyboard Shortcuts ===================== */}
+      <section
+        id="controls"
+        style={{
+          position: "relative",
+          zIndex: 10,
+          padding: "80px clamp(20px, 5vw, 60px)",
+        }}
+      >
+        <h2
+          style={{
+            textAlign: "center",
+            fontSize: "clamp(1.5rem, 4vw, 2.2rem)",
+            fontWeight: 800,
+            color: "#e0e0f0",
+            marginBottom: 16,
+            letterSpacing: "0.03em",
+          }}
+        >
+          Keyboard Shortcuts
+        </h2>
+        <p
+          style={{
+            textAlign: "center",
+            color: "rgba(224,224,240,0.45)",
+            fontSize: "0.95rem",
+            marginBottom: 40,
+          }}
+        >
+          Master the controls and dominate the void
+        </p>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+            gap: 16,
+            maxWidth: 720,
+            margin: "0 auto",
+          }}
+        >
+          {/* Movement */}
+          <div
+            className="glass"
+            style={{
+              padding: "20px 16px",
+              borderRadius: 12,
+              display: "flex",
+              alignItems: "center",
+              gap: 14,
+            }}
+          >
+            <div style={{ display: "flex", gap: 4 }}>
+              {["W", "A", "S", "D"].map((key) => (
+                <kbd
+                  key={key}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: 32,
+                    height: 32,
+                    borderRadius: 6,
+                    border: "1px solid rgba(0, 240, 255, 0.35)",
+                    background: "rgba(0, 240, 255, 0.07)",
+                    color: "#00f0ff",
+                    fontSize: "0.8rem",
+                    fontWeight: 700,
+                    fontFamily: "var(--font-geist-mono), monospace",
+                    boxShadow: "0 0 8px rgba(0, 240, 255, 0.15)",
+                  }}
+                >
+                  {key}
+                </kbd>
+              ))}
+            </div>
+            <span style={{ color: "rgba(224,224,240,0.6)", fontSize: "0.85rem" }}>
+              Move
+            </span>
+          </div>
+
+          {/* Pause */}
+          <div
+            className="glass"
+            style={{
+              padding: "20px 16px",
+              borderRadius: 12,
+              display: "flex",
+              alignItems: "center",
+              gap: 14,
+            }}
+          >
+            <kbd
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                minWidth: 48,
+                height: 32,
+                padding: "0 10px",
+                borderRadius: 6,
+                border: "1px solid rgba(255, 0, 170, 0.35)",
+                background: "rgba(255, 0, 170, 0.07)",
+                color: "#ff00aa",
+                fontSize: "0.75rem",
+                fontWeight: 700,
+                fontFamily: "var(--font-geist-mono), monospace",
+                boxShadow: "0 0 8px rgba(255, 0, 170, 0.15)",
+              }}
+            >
+              ESC
+            </kbd>
+            <span style={{ color: "rgba(224,224,240,0.6)", fontSize: "0.85rem" }}>
+              Pause
+            </span>
+          </div>
+
+          {/* Mute */}
+          <div
+            className="glass"
+            style={{
+              padding: "20px 16px",
+              borderRadius: 12,
+              display: "flex",
+              alignItems: "center",
+              gap: 14,
+            }}
+          >
+            <kbd
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 32,
+                height: 32,
+                borderRadius: 6,
+                border: "1px solid rgba(170, 68, 255, 0.35)",
+                background: "rgba(170, 68, 255, 0.07)",
+                color: "#aa44ff",
+                fontSize: "0.8rem",
+                fontWeight: 700,
+                fontFamily: "var(--font-geist-mono), monospace",
+                boxShadow: "0 0 8px rgba(170, 68, 255, 0.15)",
+              }}
+            >
+              M
+            </kbd>
+            <span style={{ color: "rgba(224,224,240,0.6)", fontSize: "0.85rem" }}>
+              Mute audio
+            </span>
+          </div>
+
+          {/* Upgrade selection */}
+          <div
+            className="glass"
+            style={{
+              padding: "20px 16px",
+              borderRadius: 12,
+              display: "flex",
+              alignItems: "center",
+              gap: 14,
+            }}
+          >
+            <div style={{ display: "flex", gap: 4 }}>
+              {["1", "2", "3"].map((key) => (
+                <kbd
+                  key={key}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: 32,
+                    height: 32,
+                    borderRadius: 6,
+                    border: "1px solid rgba(0, 255, 136, 0.35)",
+                    background: "rgba(0, 255, 136, 0.07)",
+                    color: "#00ff88",
+                    fontSize: "0.8rem",
+                    fontWeight: 700,
+                    fontFamily: "var(--font-geist-mono), monospace",
+                    boxShadow: "0 0 8px rgba(0, 255, 136, 0.15)",
+                  }}
+                >
+                  {key}
+                </kbd>
+              ))}
+            </div>
+            <span style={{ color: "rgba(224,224,240,0.6)", fontSize: "0.85rem" }}>
+              Select upgrade
+            </span>
+          </div>
         </div>
       </section>
 

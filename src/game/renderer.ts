@@ -27,6 +27,12 @@ export class Renderer {
   public width: number;
   public height: number;
 
+  // Wave announcement state
+  private waveAnnounceWave: number = 0;
+  private waveAnnounceTime: number = 0; // timestamp when announcement started
+  private waveAnnounceDuration: number = 3; // seconds
+  private waveAnnounceActive: boolean = false;
+
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d')!;
@@ -361,7 +367,13 @@ export class Renderer {
 
   // ── HUD ───────────────────────────────────────────────────────
 
-  drawHUD(state: GameState): void {
+  announceWave(wave: number): void {
+    this.waveAnnounceWave = wave;
+    this.waveAnnounceTime = performance.now() / 1000;
+    this.waveAnnounceActive = true;
+  }
+
+  drawHUD(state: GameState, worldSize: number = 4000): void {
     const ctx = this.ctx;
     const player = state.player;
 
@@ -381,8 +393,15 @@ export class Renderer {
         : healthRatio > 0.25
           ? '#ffaa00'
           : '#ff3344';
+
+    // Pulse the health bar when below 25%
+    if (healthRatio < 0.25 && healthRatio > 0) {
+      const barPulse = 0.6 + Math.sin(Date.now() * 0.008) * 0.4;
+      ctx.globalAlpha = barPulse;
+    }
     ctx.fillStyle = healthColor;
     ctx.fillRect(hbX, hbY, hbWidth * healthRatio, hbHeight);
+    ctx.globalAlpha = 1;
 
     // HP text
     ctx.fillStyle = '#ffffff';
@@ -420,6 +439,10 @@ export class Renderer {
     ctx.fillStyle = '#ff8800';
     ctx.fillText(`WAVE ${state.wave}`, this.width - 20, 50);
 
+    // Kills
+    ctx.fillStyle = '#ff4466';
+    ctx.fillText(`KILLS ${state.enemiesKilled ?? 0}`, this.width - 20, 70);
+
     // Time
     const minutes = Math.floor(state.time / 60);
     const seconds = Math.floor(state.time % 60);
@@ -433,6 +456,26 @@ export class Renderer {
 
     // Ability icons at the bottom
     this.drawAbilityIcons(player.abilities, state.time);
+
+    // Minimap
+    this.drawMinimap(state, worldSize);
+
+    // Low health red vignette effect
+    if (healthRatio < 0.3 && healthRatio > 0) {
+      const intensity = (1 - healthRatio / 0.3) * 0.4;
+      const pulse = 1 + Math.sin(Date.now() * 0.005) * 0.3;
+      const gradient = ctx.createRadialGradient(
+        this.width / 2, this.height / 2, this.width * 0.3,
+        this.width / 2, this.height / 2, this.width * 0.7
+      );
+      gradient.addColorStop(0, 'transparent');
+      gradient.addColorStop(1, `rgba(255, 0, 0, ${intensity * pulse})`);
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, this.width, this.height);
+    }
+
+    // Wave announcement banner
+    this.drawWaveAnnouncement();
   }
 
   private drawAbilityIcons(abilities: Ability[], gameTime: number): void {
@@ -466,6 +509,112 @@ export class Renderer {
       ctx.fillStyle = ab.color;
       ctx.fillText(`${ab.level}`, x + iconSize / 2, y + iconSize - 4);
     });
+  }
+
+  // ── Minimap ──────────────────────────────────────────────────
+
+  private drawMinimap(state: GameState, worldSize: number): void {
+    const ctx = this.ctx;
+    const size = 140;
+    const margin = 15;
+    const mx = this.width - size - margin;
+    const my = this.height - size - margin;
+    const scale = size / worldSize;
+
+    // Background
+    ctx.fillStyle = 'rgba(5, 5, 15, 0.7)';
+    ctx.fillRect(mx, my, size, size);
+
+    // Border (neon cyan)
+    ctx.strokeStyle = '#00ddff';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(mx, my, size, size);
+
+    // XP orbs (tiny green dots)
+    ctx.fillStyle = '#00ff88';
+    for (const orb of state.xpOrbs) {
+      if (!orb.active) continue;
+      const ox = mx + orb.pos.x * scale;
+      const oy = my + orb.pos.y * scale;
+      ctx.fillRect(ox - 1, oy - 1, 2, 2);
+    }
+
+    // Enemies (small red dots)
+    ctx.fillStyle = '#ff3344';
+    for (const enemy of state.enemies) {
+      if (!enemy.active) continue;
+      const ex = mx + enemy.pos.x * scale;
+      const ey = my + enemy.pos.y * scale;
+      const dotSize = enemy.enemyType === 'boss' ? 4 : 2;
+      ctx.fillRect(ex - dotSize / 2, ey - dotSize / 2, dotSize, dotSize);
+    }
+
+    // Viewport rectangle
+    const cam = state.camera;
+    const vpX = mx + (cam.x - this.width / 2) * scale;
+    const vpY = my + (cam.y - this.height / 2) * scale;
+    const vpW = this.width * scale;
+    const vpH = this.height * scale;
+
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(vpX, vpY, vpW, vpH);
+
+    // Player (bright cyan dot)
+    const px = mx + state.player.pos.x * scale;
+    const py = my + state.player.pos.y * scale;
+    ctx.fillStyle = '#00ffff';
+    ctx.fillRect(px - 2, py - 2, 4, 4);
+  }
+
+  // ── Wave Announcement ──────────────────────────────────────────
+
+  private drawWaveAnnouncement(): void {
+    if (!this.waveAnnounceActive) return;
+
+    const now = performance.now() / 1000;
+    const elapsed = now - this.waveAnnounceTime;
+
+    if (elapsed >= this.waveAnnounceDuration) {
+      this.waveAnnounceActive = false;
+      return;
+    }
+
+    const ctx = this.ctx;
+    const half = this.waveAnnounceDuration / 2;
+
+    // Fade in during first half, fade out during second half
+    let alpha: number;
+    if (elapsed < half) {
+      alpha = elapsed / half;
+    } else {
+      alpha = 1 - (elapsed - half) / half;
+    }
+    alpha = Math.max(0, Math.min(1, alpha));
+
+    const text = `WAVE ${this.waveAnnounceWave}`;
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 64px monospace';
+
+    // Glow effect using shadowBlur (transient, acceptable)
+    ctx.shadowBlur = 30;
+    ctx.shadowColor = '#ff8800';
+    ctx.fillStyle = '#ffaa00';
+    ctx.fillText(text, this.width / 2, this.height / 2 - 40);
+
+    // Second pass for brighter core
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = '#ffdd44';
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 64px monospace';
+    ctx.fillText(text, this.width / 2, this.height / 2 - 40);
+
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+    ctx.restore();
   }
 
   // ── Upgrade Screen ────────────────────────────────────────────

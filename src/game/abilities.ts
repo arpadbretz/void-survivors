@@ -497,6 +497,8 @@ export function applyUpgradeChoice(player: Player, choice: Ability): void {
 
 export function getAbilityDescription(ability: Ability, level: number): string {
   switch (ability.id) {
+    case 'auto_cannon':
+      return `Auto-fires at nearest enemy. ${8 + level * 4} damage, ${(0.4 - (level - 1) * 0.05).toFixed(2)}s cooldown.${level >= 3 ? ` Piercing ${level >= 5 ? 2 : 1}.` : ''}`;
     case 'radial_shot':
       return `Fires ${4 + level * 2} projectiles in a ring. ${15 + level * 8} damage each.`;
     case 'orbit_shield':
