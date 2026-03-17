@@ -819,7 +819,71 @@ export default function HomePage() {
                 textTransform: "uppercase",
               }}
             >
-              v1.3 &mdash; Latest
+              v1.8 &mdash; Latest
+            </div>
+            <p
+              style={{
+                fontSize: "0.95rem",
+                color: "rgba(224,224,240,0.65)",
+                lineHeight: 1.6,
+                margin: 0,
+              }}
+            >
+              Ability Synergies, Global Leaderboard &amp; Visual Polish. Six ability synergy combos with passive bonuses, a cross-player leaderboard with daily rankings, enhanced orbit shield visuals, and nebula-filled cosmic backgrounds.
+            </p>
+          </div>
+
+          <div
+            className="glass"
+            style={{
+              padding: "20px 24px",
+              borderRadius: 12,
+              borderLeft: "3px solid #00f0ff",
+            }}
+          >
+            <div
+              style={{
+                fontSize: "0.75rem",
+                letterSpacing: "0.12em",
+                color: "#00f0ff",
+                fontWeight: 700,
+                marginBottom: 6,
+                textTransform: "uppercase",
+              }}
+            >
+              v1.5
+            </div>
+            <p
+              style={{
+                fontSize: "0.95rem",
+                color: "rgba(224,224,240,0.65)",
+                lineHeight: 1.6,
+                margin: 0,
+              }}
+            >
+              Difficulty Modes, Combo System &amp; Run History. Four difficulty levels with score multipliers, endless late-game scaling, visual combo multiplier, and detailed run history with progress tracking.
+            </p>
+          </div>
+
+          <div
+            className="glass"
+            style={{
+              padding: "20px 24px",
+              borderRadius: 12,
+              borderLeft: "3px solid #00f0ff",
+            }}
+          >
+            <div
+              style={{
+                fontSize: "0.75rem",
+                letterSpacing: "0.12em",
+                color: "#00f0ff",
+                fontWeight: 700,
+                marginBottom: 6,
+                textTransform: "uppercase",
+              }}
+            >
+              v1.3
             </div>
             <p
               style={{
@@ -1171,6 +1235,78 @@ export default function HomePage() {
               }}
             >
               Every day features a new challenge with unique modifiers that change how the game plays. Compete against yourself for the best daily score!
+            </p>
+          </details>
+
+          <details
+            className="glass"
+            style={{
+              padding: "0",
+              borderRadius: 12,
+              overflow: "hidden",
+            }}
+          >
+            <summary
+              style={{
+                padding: "20px 24px",
+                cursor: "pointer",
+                fontSize: "1rem",
+                fontWeight: 700,
+                color: "#00f0ff",
+                listStyle: "none",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              What are Ability Synergies?
+            </summary>
+            <p
+              style={{
+                padding: "0 24px 20px",
+                margin: 0,
+                fontSize: "0.95rem",
+                color: "rgba(224,224,240,0.65)",
+                lineHeight: 1.6,
+              }}
+            >
+              Certain ability combinations unlock powerful synergy bonuses. For example, pairing Chain Lightning with Frost Aura activates the Elemental Storm synergy for bonus damage. Look for the golden synergy badge when choosing upgrades!
+            </p>
+          </details>
+
+          <details
+            className="glass"
+            style={{
+              padding: "0",
+              borderRadius: 12,
+              overflow: "hidden",
+            }}
+          >
+            <summary
+              style={{
+                padding: "20px 24px",
+                cursor: "pointer",
+                fontSize: "1rem",
+                fontWeight: 700,
+                color: "#00f0ff",
+                listStyle: "none",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              Is there a global leaderboard?
+            </summary>
+            <p
+              style={{
+                padding: "0 24px 20px",
+                margin: 0,
+                fontSize: "0.95rem",
+                color: "rgba(224,224,240,0.65)",
+                lineHeight: 1.6,
+              }}
+            >
+              Yes! Compete with players worldwide on both all-time and daily leaderboards. Set your player name in the game menu and your best scores are automatically submitted after each run.
             </p>
           </details>
         </div>

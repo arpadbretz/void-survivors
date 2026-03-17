@@ -118,6 +118,14 @@ export class Renderer {
   // Kill counter flash state
   private killFlashEntries: { count: number; time: number }[] = [];
 
+  // Kill streak announcement state
+  private streakAnnouncements: { text: string; color: string; time: number }[] = [];
+
+  // Wave pulse effect state
+  private wavePulseActive: boolean = false;
+  private wavePulseTime: number = 0;
+  private readonly wavePulseDuration: number = 0.8;
+
   // Dynamic background color (lerped per wave)
   private currentBgR: number = 10;
   private currentBgG: number = 10;
@@ -1228,13 +1236,43 @@ export class Renderer {
     const alpha = p.life / p.maxLife;
 
     if (p.text) {
-      // Damage numbers
+      // Damage numbers with pop effect
       ctx.globalCompositeOperation = 'source-over';
-      ctx.font = `bold ${Math.max(12, p.size)}px monospace`;
+
+      // Pop effect: scale up quickly then shrink as it fades
+      // t goes from 1 (just spawned) to 0 (about to die)
+      const t = 1 - alpha; // 0 = just spawned, 1 = about to die
+      let popScale: number;
+      if (t < 0.15) {
+        // Scale up quickly in first 15% of life
+        popScale = 1.0 + (t / 0.15) * 0.5; // 1.0 -> 1.5
+      } else {
+        // Shrink back down over remaining life
+        popScale = 1.5 - ((t - 0.15) / 0.85) * 0.7; // 1.5 -> 0.8
+      }
+
+      const fontSize = Math.max(12, Math.round(p.size * popScale));
+      ctx.font = `bold ${fontSize}px monospace`;
       ctx.fillStyle = p.color;
       ctx.globalAlpha = alpha;
       ctx.textAlign = 'center';
-      ctx.fillText(p.text, p.pos.x, p.pos.y);
+
+      // Critical hits get extra glow outline
+      if (p.isCrit) {
+        ctx.strokeStyle = '#ff0000';
+        ctx.lineWidth = 2;
+        ctx.strokeText(p.text, p.pos.x, p.pos.y);
+        // Bright white core for crits
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(p.text, p.pos.x, p.pos.y);
+        // Then overlay with the red tint
+        ctx.globalAlpha = alpha * 0.6;
+        ctx.fillStyle = p.color;
+        ctx.fillText(p.text, p.pos.x, p.pos.y);
+      } else {
+        ctx.fillText(p.text, p.pos.x, p.pos.y);
+      }
+
       ctx.globalAlpha = 1;
       return;
     }
@@ -1703,11 +1741,77 @@ export class Renderer {
     }
   }
 
+  // ── Kill Streak Announcements ──────────────────────────────
+
+  announceStreak(text: string, color: string): void {
+    this.streakAnnouncements.push({ text, color, time: performance.now() / 1000 });
+  }
+
+  private drawStreakAnnouncements(): void {
+    const now = performance.now() / 1000;
+    const DURATION = 2.0;
+    this.streakAnnouncements = this.streakAnnouncements.filter(e => now - e.time < DURATION);
+
+    const ctx = this.ctx;
+    for (const entry of this.streakAnnouncements) {
+      const elapsed = now - entry.time;
+      const t = elapsed / DURATION; // 0..1
+
+      // Fade: quick fade in, hold, then fade out
+      let alpha: number;
+      if (t < 0.1) {
+        alpha = t / 0.1; // fade in
+      } else if (t < 0.6) {
+        alpha = 1; // hold
+      } else {
+        alpha = 1 - (t - 0.6) / 0.4; // fade out
+      }
+
+      // Scale: pop in then settle
+      let scale: number;
+      if (t < 0.1) {
+        scale = 0.5 + (t / 0.1) * 0.8; // 0.5 -> 1.3
+      } else if (t < 0.2) {
+        scale = 1.3 - ((t - 0.1) / 0.1) * 0.3; // 1.3 -> 1.0
+      } else {
+        scale = 1.0;
+      }
+
+      const fontSize = Math.round(42 * scale);
+      const y = this.height / 2 + 40; // below center (wave announcement is above)
+
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, alpha);
+      ctx.textAlign = 'center';
+      ctx.font = `bold ${fontSize}px monospace`;
+
+      // Glow outline
+      ctx.strokeStyle = entry.color;
+      ctx.lineWidth = 3;
+      ctx.strokeText(entry.text, this.width / 2, y);
+
+      // Bright white core
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(entry.text, this.width / 2, y);
+
+      // Color overlay
+      ctx.globalAlpha = Math.max(0, alpha * 0.5);
+      ctx.fillStyle = entry.color;
+      ctx.fillText(entry.text, this.width / 2, y);
+
+      ctx.restore();
+    }
+  }
+
   announceWave(wave: number, subtitle?: string): void {
     this.waveAnnounceWave = wave;
     this.waveAnnounceTime = performance.now() / 1000;
     this.waveAnnounceActive = true;
     this.waveAnnounceSubtitle = subtitle;
+
+    // Trigger wave pulse effect
+    this.wavePulseActive = true;
+    this.wavePulseTime = performance.now() / 1000;
   }
 
   drawHUD(state: GameState, worldSize: number = 4000): void {
@@ -1942,8 +2046,14 @@ export class Renderer {
     // Synergy icons above ability bar
     this.drawSynergyIcons(state);
 
+    // Wave pulse effect (radial flash on new wave)
+    this.drawWavePulse();
+
     // Wave announcement banner
     this.drawWaveAnnouncement();
+
+    // Kill streak announcements
+    this.drawStreakAnnouncements();
 
     // Tutorial hints
     this.drawTutorialHints();
@@ -2113,6 +2223,46 @@ export class Renderer {
 
     ctx.shadowBlur = 0;
     ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
+  // ── Wave Pulse Effect ────────────────────────────────────────
+
+  private drawWavePulse(): void {
+    if (!this.wavePulseActive) return;
+
+    const now = performance.now() / 1000;
+    const elapsed = now - this.wavePulseTime;
+
+    if (elapsed >= this.wavePulseDuration) {
+      this.wavePulseActive = false;
+      return;
+    }
+
+    const t = elapsed / this.wavePulseDuration; // 0..1
+    const ctx = this.ctx;
+
+    // Radial flash from center that expands and fades
+    const maxRadius = Math.max(this.width, this.height) * 0.8;
+    const radius = t * maxRadius;
+    const alpha = (1 - t) * 0.25; // subtle, starts at 0.25 and fades to 0
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+
+    const gradient = ctx.createRadialGradient(
+      this.width / 2, this.height / 2, radius * 0.3,
+      this.width / 2, this.height / 2, radius
+    );
+    gradient.addColorStop(0, `rgba(255, 180, 50, 0)`);
+    gradient.addColorStop(0.4, `rgba(255, 180, 50, ${alpha * 0.8})`);
+    gradient.addColorStop(0.7, `rgba(255, 140, 30, ${alpha * 0.4})`);
+    gradient.addColorStop(1, `rgba(255, 100, 0, 0)`);
+
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, this.width, this.height);
+
+    ctx.globalCompositeOperation = 'source-over';
     ctx.restore();
   }
 

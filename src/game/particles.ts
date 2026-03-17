@@ -146,23 +146,38 @@ export class ParticleSystem implements ParticleSystemInterface {
     }
   }
 
-  emitDamageNumber(x: number, y: number, damage: number): void {
+  emitDamageNumber(x: number, y: number, damage: number, comboColor?: string): void {
     // Throttle: don't show if too many active damage numbers
     if (this.activeDamageNumbers >= MAX_DAMAGE_NUMBERS) return;
 
     const p = this.acquire();
     if (!p) return;
 
+    const isCrit = damage > 50;
+
     p.pos.x = x + randomRange(-10, 10);
     p.pos.y = y - 10;
     p.vel.x = randomRange(-15, 15);
-    p.vel.y = -60;
-    p.life = 0.8;
-    p.maxLife = 0.8;
-    p.color = damage >= 50 ? '#ffdd00' : '#ffffff';
-    p.size = damage >= 50 ? 18 : 14;
+    p.vel.y = isCrit ? -80 : -60;
+    p.life = isCrit ? 1.0 : 0.8;
+    p.maxLife = p.life;
+    p.isCrit = isCrit;
+
+    // Color priority: crit red > combo color > default white
+    if (isCrit) {
+      p.color = '#ff2222';
+      p.size = 24;
+      p.text = `CRIT! ${Math.round(damage)}`;
+    } else if (comboColor) {
+      p.color = comboColor;
+      p.size = 16;
+      p.text = Math.round(damage).toString();
+    } else {
+      p.color = '#ffffff';
+      p.size = 14;
+      p.text = Math.round(damage).toString();
+    }
     p.decay = 1;
-    p.text = Math.round(damage).toString();
   }
 
   emitLevelUp(x: number, y: number): void {

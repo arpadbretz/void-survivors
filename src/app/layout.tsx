@@ -173,6 +173,22 @@ const jsonLd = [
           text: "Every day features a new challenge with unique modifiers that change how the game plays. Compete against yourself for the best daily score!",
         },
       },
+      {
+        "@type": "Question",
+        name: "What are Ability Synergies in Void Survivors?",
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: "Certain ability combinations unlock powerful synergy bonuses like extra damage, faster cooldowns, or health regeneration. Look for the golden synergy badge when choosing upgrades to build powerful combos.",
+        },
+      },
+      {
+        "@type": "Question",
+        name: "Is there a global leaderboard in Void Survivors?",
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: "Yes! Compete with players worldwide on both all-time and daily leaderboards. Set your player name and your best scores are automatically submitted after each run.",
+        },
+      },
     ],
   },
 ];

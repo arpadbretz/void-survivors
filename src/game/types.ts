@@ -73,6 +73,7 @@ export interface Particle {
   size: number;
   decay: number;
   text?: string;
+  isCrit?: boolean;
   active: boolean;
 }
 
@@ -135,7 +136,7 @@ export interface ParticleSystemInterface {
   emitExplosion: (x: number, y: number, color: string, count?: number) => void;
   emitTrail: (x: number, y: number, color: string) => void;
   emitXPPickup: (x: number, y: number) => void;
-  emitDamageNumber: (x: number, y: number, damage: number) => void;
+  emitDamageNumber: (x: number, y: number, damage: number, comboColor?: string) => void;
   emitLevelUp: (x: number, y: number) => void;
 }
 

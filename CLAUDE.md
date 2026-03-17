@@ -41,7 +41,7 @@
 - `opengraph-image.tsx` — Dynamic OG image generation
 
 ### Game Screens (managed in play/page.tsx)
-`menu | playing | paused | upgrade | gameover | achievements | stats | shop | characters | daily | settings`
+`menu | playing | paused | upgrade | gameover | achievements | stats | shop | characters | daily | settings | leaderboard`
 
 ## Key Conventions
 - **NO `shadowBlur` during gameplay rendering** — use polygon overlays instead (see renderer.ts header comment)
@@ -60,6 +60,10 @@
 - Environmental hazards: void rifts, plasma pools, gravity anomalies
 - Loot drops from bosses: health, bomb, magnet, shield
 - Endless scaling: HP/speed/spawn rate increase per wave, dual bosses at wave 20+
+- 6 ability synergies: Elemental Storm, Bullet Hell, Artillery Command, Cosmic Barrier, Rapid Fire, Death Zone
+- Synergy bonuses: damage_mult, cooldown_mult, range_mult, health_regen, speed_mult, xp_mult
+- Orbit shield renders visible glowing orbs with sparkle trails (renderer.ts `drawOrbitShield`)
+- Global leaderboard: all-time + daily rankings via Upstash Redis
 
 ## Performance Rules
 - Never use `shadowBlur` in the render loop

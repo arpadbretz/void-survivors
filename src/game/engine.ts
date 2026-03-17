@@ -171,6 +171,16 @@ export class GameEngine {
   private maxCombo: number = 0;
   private readonly COMBO_TIMEOUT = 2.0;
 
+  /** Returns a color string based on current combo count (matches renderer combo colors) */
+  private getComboColor(): string | undefined {
+    if (this.comboCount >= 100) return '#ffd700';
+    if (this.comboCount >= 50) return '#ff00ff';
+    if (this.comboCount >= 25) return '#ff3344';
+    if (this.comboCount >= 10) return '#ff8800';
+    if (this.comboCount >= 5) return '#ffdd00';
+    return undefined; // no combo active — use default
+  }
+
   // Dash state
   private dashCooldown: number = 0;
   private dashTimer: number = 0;
@@ -996,7 +1006,8 @@ export class GameEngine {
           this.particles.emitDamageNumber(
             enemy.pos.x,
             enemy.pos.y,
-            actualDamage
+            actualDamage,
+            this.getComboColor()
           );
           this.particles.emit(proj.pos.x, proj.pos.y, 4, enemy.color, 60, 0.2);
           this.audio.playHit();
@@ -1010,7 +1021,7 @@ export class GameEngine {
               if (aoeDist < proj.aoe.radius) {
                 other.health -= aoeDamage;
                 this.damageDealt += aoeDamage;
-                this.particles.emitDamageNumber(other.pos.x, other.pos.y, aoeDamage);
+                this.particles.emitDamageNumber(other.pos.x, other.pos.y, aoeDamage, this.getComboColor());
                 this.particles.emit(other.pos.x, other.pos.y, 3, proj.color, 40, 0.15);
                 if (other.health <= 0) {
                   this.killEnemy(other);
@@ -1146,6 +1157,18 @@ export class GameEngine {
         }
         // Play combo milestone sound
         this.audio.playComboMilestone(threshold);
+
+        // Kill streak announcements
+        if (threshold === 10) {
+          this.renderer?.announceStreak('KILLING SPREE', '#ff8800');
+        } else if (threshold === 25) {
+          this.renderer?.announceStreak('RAMPAGE', '#ff3344');
+        } else if (threshold === 50) {
+          this.renderer?.announceStreak('UNSTOPPABLE', '#ff00ff');
+        } else if (threshold === 100) {
+          this.renderer?.announceStreak('GODLIKE', '#ffd700');
+        }
+
         break;
       }
     }
