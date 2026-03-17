@@ -25,12 +25,13 @@
 - `particles.ts` — Object-pooled particle system
 - `types.ts` — All TypeScript interfaces (Entity, Player, Enemy, Projectile, Particle, XPOrb, Ability, GameState, etc.)
 - `math.ts` — Vector2 utilities (vec2, sub, normalize, distance, clamp, lerp, angle)
-- `achievements.ts` — 25 achievements, 4 tiers
+- `achievements.ts` — 40 achievements, 4 tiers (bronze/silver/gold/platinum)
 - `stats.ts` — Persistent lifetime stats
 - `meta.ts` — Meta-progression currency and upgrades
 - `characters.ts` — 3 playable characters with unique stats
 - `daily.ts` — Daily challenge system with modifiers
 - `settings.ts` — Game settings persistence
+- `difficulty.ts` — 4 difficulty modes (Easy/Normal/Hard/Nightmare) with multipliers
 
 ### React UI (`src/app/`)
 - `page.tsx` — Landing/marketing page (server component, CSS-only floating shapes)
@@ -55,6 +56,10 @@
 - Engine communicates with React via callbacks (`EngineCallbacks` interface)
 - `WORLD_SIZE = 4000`, `WAVE_DURATION = 30` seconds per wave
 - Wave-based background/grid colors shift as waves progress
+- 3 boss variants: Titan (wave 5+), Harbinger (wave 10+), Nexus (wave 15+)
+- Environmental hazards: void rifts, plasma pools, gravity anomalies
+- Loot drops from bosses: health, bomb, magnet, shield
+- Endless scaling: HP/speed/spawn rate increase per wave, dual bosses at wave 20+
 
 ## Performance Rules
 - Never use `shadowBlur` in the render loop
