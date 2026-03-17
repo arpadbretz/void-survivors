@@ -1,0 +1,15 @@
+{
+  "name": "Void Survivors",
+  "short_name": "Void Survivors",
+  "description": "Survive the void. A neon roguelike survivors game.",
+  "start_url": "/play",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#0a0a12",
+  "theme_color": "#00eeff",
+  "categories": ["games", "entertainment"],
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

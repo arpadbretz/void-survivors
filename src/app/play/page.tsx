@@ -184,6 +184,10 @@ export default function PlayPage() {
   const [dailyResult, setDailyResult] = useState<import("@/game/daily").DailyResult | null>(null);
   const [isDailyMode, setIsDailyMode] = useState(false);
 
+  // PWA install prompt state
+  const deferredPromptRef = useRef<Event | null>(null);
+  const [showInstallBtn, setShowInstallBtn] = useState(false);
+
   // Joystick state
   const joystickRef = useRef<HTMLDivElement>(null);
   const [joystickActive, setJoystickActive] = useState(false);
@@ -192,6 +196,9 @@ export default function PlayPage() {
 
   // Fullscreen state
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Share score state
+  const [shareStatus, setShareStatus] = useState<"idle" | "shared" | "copied">("idle");
 
   // -----------------------------------------------------------------------
   // Load high scores, achievements, and stats on mount
@@ -245,6 +252,33 @@ export default function PlayPage() {
     check();
     window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
+  }, []);
+
+  // -----------------------------------------------------------------------
+  // PWA install prompt
+  // -----------------------------------------------------------------------
+  useEffect(() => {
+    const handler = (e: Event) => {
+      e.preventDefault();
+      deferredPromptRef.current = e;
+      setShowInstallBtn(true);
+    };
+    window.addEventListener("beforeinstallprompt", handler);
+    // Hide button if app was installed
+    const installed = () => setShowInstallBtn(false);
+    window.addEventListener("appinstalled", installed);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handler);
+      window.removeEventListener("appinstalled", installed);
+    };
+  }, []);
+
+  const handleInstallClick = useCallback(() => {
+    const prompt = deferredPromptRef.current as (Event & { prompt: () => void }) | null;
+    if (!prompt) return;
+    prompt.prompt();
+    setShowInstallBtn(false);
+    deferredPromptRef.current = null;
   }, []);
 
   // -----------------------------------------------------------------------
@@ -547,6 +581,60 @@ export default function PlayPage() {
       engineRef.current?.startAttractMode(canvasRef.current);
     }
   }, []);
+
+  // -----------------------------------------------------------------------
+  // Share score
+  // -----------------------------------------------------------------------
+  const handleShareScore = useCallback(async () => {
+    if (!gameOverStats) return;
+
+    const shareText = isDailyMode && dailyChallenge
+      ? [
+          "\u{1F3AE} Void Survivors \u2014 Daily Challenge",
+          `\u{1F4C5} ${dailyChallenge.title}`,
+          `\u2B50 Score: ${gameOverStats.score.toLocaleString()}`,
+          `\u23F1\uFE0F Time: ${formatTime(gameOverStats.timeSurvived)}`,
+          `\u{1F30A} Wave: ${gameOverStats.wavesSurvived}`,
+          "",
+          "Can you beat my score?",
+          "\u{1F3AE} https://void-survivors.vercel.app",
+        ].join("\n")
+      : [
+          "\u{1F3AE} Void Survivors",
+          `\u2B50 Score: ${gameOverStats.score.toLocaleString()}`,
+          `\u23F1\uFE0F Time: ${formatTime(gameOverStats.timeSurvived)}`,
+          `\u{1F30A} Wave: ${gameOverStats.wavesSurvived}`,
+          `\u2694\uFE0F Kills: ${gameOverStats.enemiesKilled.toLocaleString()}`,
+          `\u{1F3C6} Level: ${gameOverStats.level}`,
+          "",
+          "Can you beat my score?",
+          "\u{1F3AE} https://void-survivors.vercel.app",
+        ].join("\n");
+
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({
+          title: "Void Survivors",
+          text: shareText,
+          url: "https://void-survivors.vercel.app",
+        });
+        setShareStatus("shared");
+      } catch {
+        // User cancelled or share failed — do nothing
+        return;
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(shareText);
+        setShareStatus("copied");
+      } catch {
+        // Clipboard unavailable
+        return;
+      }
+    }
+
+    setTimeout(() => setShareStatus("idle"), 2000);
+  }, [gameOverStats, isDailyMode, dailyChallenge]);
 
   // -----------------------------------------------------------------------
   // Sound toggle
@@ -990,6 +1078,37 @@ export default function PlayPage() {
             >
               {soundEnabled ? "\u{1F50A} Sound On" : "\u{1F507} Sound Off"}
             </button>
+
+            {showInstallBtn && (
+              <button
+                onClick={handleInstallClick}
+                style={{
+                  marginTop: 10,
+                  background: "none",
+                  border: "1px solid rgba(0,240,255,0.25)",
+                  borderRadius: 8,
+                  color: "rgba(0,240,255,0.6)",
+                  padding: "8px 16px",
+                  cursor: "pointer",
+                  fontSize: "0.85rem",
+                  fontFamily: "var(--font-geist-mono), monospace",
+                  letterSpacing: "0.05em",
+                  transition: "all 0.2s",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = "#00f0ff";
+                  e.currentTarget.style.color = "#00f0ff";
+                  e.currentTarget.style.boxShadow = "0 0 10px rgba(0,240,255,0.2)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = "rgba(0,240,255,0.25)";
+                  e.currentTarget.style.color = "rgba(0,240,255,0.6)";
+                  e.currentTarget.style.boxShadow = "none";
+                }}
+              >
+                Install App
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -2836,6 +2955,33 @@ export default function PlayPage() {
             >
               <button className="btn-neon-filled" onClick={restartGame}>
                 PLAY AGAIN
+              </button>
+              <button
+                onClick={handleShareScore}
+                style={{
+                  padding: "10px 24px",
+                  borderRadius: 8,
+                  border: "none",
+                  background: "linear-gradient(135deg, #8b5cf6, #06b6d4)",
+                  color: "#fff",
+                  fontWeight: 700,
+                  fontSize: "0.85rem",
+                  letterSpacing: "0.08em",
+                  cursor: "pointer",
+                  textTransform: "uppercase",
+                  transition: "opacity 0.2s, transform 0.2s",
+                  opacity: shareStatus !== "idle" ? 0.85 : 1,
+                  textShadow: "0 0 8px rgba(139,92,246,0.5)",
+                  minWidth: 150,
+                }}
+                onMouseEnter={(e) => { (e.target as HTMLElement).style.opacity = "0.85"; }}
+                onMouseLeave={(e) => { (e.target as HTMLElement).style.opacity = shareStatus !== "idle" ? "0.85" : "1"; }}
+              >
+                {shareStatus === "shared"
+                  ? "Shared! \u2713"
+                  : shareStatus === "copied"
+                  ? "Copied! \u2713"
+                  : "Share Score \u{1F517}"}
               </button>
               <button className="btn-neon" onClick={backToMenu}>
                 MAIN MENU
