@@ -1000,7 +1000,23 @@ export class GameEngine {
         if (dist < proj.radius + enemy.radius) {
           const dailyDamageMult = getModifierValue(this.dailyModifiers, 'damage_mult');
           const synergyBonuses = computeSynergyBonuses(this.state.activeSynergies);
-          const actualDamage = Math.floor(proj.damage * this.metaBonuses.damageMultiplier * this.characterDef.damageMultiplier * dailyDamageMult * synergyBonuses.damageMult);
+          let actualDamage = Math.floor(proj.damage * this.metaBonuses.damageMultiplier * this.characterDef.damageMultiplier * dailyDamageMult * synergyBonuses.damageMult);
+
+          // Check if enemy is within any shielder's aura (50% damage reduction)
+          let shielded = false;
+          for (const other of s.enemies) {
+            if (!other.active || other.enemyType !== 'shielder' || other.id === enemy.id) continue;
+            if (other.shieldAuraRadius && distance(enemy.pos, other.pos) < other.shieldAuraRadius) {
+              shielded = true;
+              break;
+            }
+          }
+          if (shielded) {
+            actualDamage = Math.floor(actualDamage * 0.5);
+            // Blue particle cue for shielded damage
+            this.particles.emit(enemy.pos.x, enemy.pos.y, 2, '#44aaff', 40, 0.15);
+          }
+
           enemy.health -= actualDamage;
           this.damageDealt += actualDamage;
           this.particles.emitDamageNumber(
@@ -1099,6 +1115,12 @@ export class GameEngine {
 
   private killEnemy(enemy: Enemy): void {
     enemy.active = false;
+
+    // Shielder: blue burst of particles (shield breaking effect)
+    if (enemy.enemyType === 'shielder') {
+      this.particles.emitExplosion(enemy.pos.x, enemy.pos.y, '#44aaff', 12);
+      this.particles.emit(enemy.pos.x, enemy.pos.y, 8, '#2288dd', 80, 0.4);
+    }
 
     // Splitter: spawn mini enemies on death
     if (enemy.enemyType === 'splitter') {

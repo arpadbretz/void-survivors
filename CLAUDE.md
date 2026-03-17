@@ -20,7 +20,7 @@
 - `engine.ts` — Main game loop, physics, collisions, state management
 - `renderer.ts` — Canvas 2D rendering, HUD, visual effects (neon aesthetic)
 - `enemies.ts` — Enemy spawning, AI, wave configs (7 types: chaser, shooter, swarm, tank, splitter, boss, phantom)
-- `abilities.ts` — Player abilities, upgrades, evolutions
+- `abilities.ts` — 11 player abilities, 6 evolutions, 7 synergies
 - `audio.ts` — Procedural SFX and music via Web Audio API (singleton AudioManager)
 - `particles.ts` — Object-pooled particle system
 - `types.ts` — All TypeScript interfaces (Entity, Player, Enemy, Projectile, Particle, XPOrb, Ability, GameState, etc.)
@@ -60,10 +60,15 @@
 - Environmental hazards: void rifts, plasma pools, gravity anomalies
 - Loot drops from bosses: health, bomb, magnet, shield
 - Endless scaling: HP/speed/spawn rate increase per wave, dual bosses at wave 20+
-- 6 ability synergies: Elemental Storm, Bullet Hell, Artillery Command, Cosmic Barrier, Rapid Fire, Death Zone
+- 7 ability synergies: Elemental Storm, Bullet Hell, Artillery Command, Cosmic Barrier, Rapid Fire, Death Zone, Nova Cascade
 - Synergy bonuses: damage_mult, cooldown_mult, range_mult, health_regen, speed_mult, xp_mult
 - Orbit shield renders visible glowing orbs with sparkle trails (renderer.ts `drawOrbitShield`)
 - Global leaderboard: all-time + daily rankings via Upstash Redis
+- Kill streak announcements: Killing Spree (10), Rampage (25), Unstoppable (50), Godlike (100)
+- Critical damage numbers (>50 dmg) with pop animation
+- Player name prompt on first game over for leaderboard
+- 11 abilities: radial_shot, auto_cannon, orbit_shield, chain_lightning, frost_aura, missile_swarm, life_drain, xp_magnet, speed_boost, gravity_well, plasma_wave
+- 6 evolutions: Nova Burst, Railgun, Thunder Storm, Void Artillery, Singularity, Supernova
 
 ## Performance Rules
 - Never use `shadowBlur` in the render loop

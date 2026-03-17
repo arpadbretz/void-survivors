@@ -409,13 +409,13 @@ export default function HomePage() {
         >
           <FeatureCard
             icon={"⚡"}
-            title="10 Abilities + 5 Evolutions"
-            description="Chain Lightning, Orbit Shield, Missile Swarm, Gravity Well and more. Max out abilities to unlock powerful Evolutions like Singularity that transform your build."
+            title="11 Abilities + 6 Evolutions"
+            description="Chain Lightning, Plasma Wave, Orbit Shield, Gravity Well and more. Max out abilities to unlock devastating Evolutions. Combine abilities for 7 powerful Synergy bonuses."
           />
           <FeatureCard
             icon={"👾"}
-            title="7 Enemy Types + Elites + 3 Boss Variants"
-            description="Face 7 enemy types with Elite variants, plus 3 unique bosses — the towering Titan, the projectile-spewing Harbinger, and the teleporting Nexus. Every wave tests your reflexes."
+            title="8 Enemy Types + 3 Boss Variants"
+            description="Face 8 enemy types with Elite variants, plus 3 unique bosses — the towering Titan, the projectile-spewing Harbinger, and the teleporting Nexus. Shielders protect their allies."
           />
           <FeatureCard
             icon={"🏆"}
@@ -444,8 +444,13 @@ export default function HomePage() {
           />
           <FeatureCard
             icon={"🎭"}
-            title="3 Characters"
-            description="Choose from 3 unique characters, each with different starting abilities and playstyles. Unlock more as you play."
+            title="4 Characters"
+            description="Choose from 4 unique characters — the balanced Void Walker, glass-cannon Phantom, tanky Sentinel, and ability-focused Arcanist. Unlock more as you play."
+          />
+          <FeatureCard
+            icon={"🏅"}
+            title="Global Leaderboard"
+            description="Compete with players worldwide on all-time and daily leaderboards. Set your name and climb the rankings with every run."
           />
           <FeatureCard
             icon={"🌐"}

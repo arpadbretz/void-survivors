@@ -41,8 +41,8 @@ const WAVE_CONFIGS: WaveConfig[] = [
   { enemyTypes: ['chaser'], spawnRate: 2.5, maxEnemies: 8, duration: 30 },
   { enemyTypes: ['chaser', 'swarm'], spawnRate: 2.0, maxEnemies: 15, duration: 30 },
   { enemyTypes: ['chaser', 'swarm', 'shooter', 'splitter'], spawnRate: 1.5, maxEnemies: 22, duration: 30 },
-  { enemyTypes: ['chaser', 'shooter', 'tank', 'splitter', 'phantom'], spawnRate: 1.2, maxEnemies: 30, duration: 30 },
-  { enemyTypes: ['chaser', 'swarm', 'shooter', 'tank', 'splitter', 'phantom'], spawnRate: 1.0, maxEnemies: 40, duration: 30 },
+  { enemyTypes: ['chaser', 'shooter', 'tank', 'splitter', 'phantom', 'shielder'], spawnRate: 1.2, maxEnemies: 30, duration: 30 },
+  { enemyTypes: ['chaser', 'swarm', 'shooter', 'tank', 'splitter', 'phantom', 'shielder'], spawnRate: 1.0, maxEnemies: 40, duration: 30 },
 ];
 
 export function getWaveConfig(wave: number, difficultyConfig?: DifficultyConfig): WaveConfig {
@@ -198,6 +198,21 @@ export function createEnemy(
         enemyType: 'phantom',
         phaseTimer: Math.random() * 3,
         phaseState: 'visible' as const,
+      };
+
+    case 'shielder':
+      return {
+        ...base,
+        radius: 12,
+        health: Math.round(40 * scaleHP),
+        maxHealth: Math.round(40 * scaleHP),
+        speed: Math.round(80 * spdMult),
+        damage: Math.round(3 * scaleDmg),
+        xpValue: 15,
+        color: '#44aaff',
+        glowColor: '#2288dd',
+        enemyType: 'shielder',
+        shieldAuraRadius: 120,
       };
 
     case 'boss': {
@@ -551,6 +566,26 @@ export function updateEnemies(
           enemy.phaseState = 'invisible';
         } else {
           enemy.phaseState = 'fading_in';
+        }
+        break;
+      }
+
+      case 'shielder': {
+        // Stay at medium range (150-250px) from the player
+        const idealDist = 200;
+        if (dist > 250) {
+          // Too far, approach
+          enemy.vel.x = dir.x * enemy.speed;
+          enemy.vel.y = dir.y * enemy.speed;
+        } else if (dist < 150) {
+          // Too close, retreat
+          enemy.vel.x = -dir.x * enemy.speed * 0.7;
+          enemy.vel.y = -dir.y * enemy.speed * 0.7;
+        } else {
+          // In sweet spot, strafe slowly to stay near other enemies
+          const strafeAngle = angle(enemy.pos, player.pos) + Math.PI / 2;
+          enemy.vel.x = Math.cos(strafeAngle) * enemy.speed * 0.4;
+          enemy.vel.y = Math.sin(strafeAngle) * enemy.speed * 0.4;
         }
         break;
       }

@@ -729,6 +729,11 @@ export class Renderer {
         color = '#aa44ff';
         rot = Math.PI / 4; // rotated 45 degrees to make a diamond
         break;
+      case 'shielder':
+        sides = 8; // octagon
+        color = '#44aaff';
+        rot = gameTime * 1.5;
+        break;
       case 'boss': {
         const variant = enemy.bossVariant ?? 'titan';
         if (variant === 'titan') {
@@ -897,6 +902,25 @@ export class Renderer {
     }
 
     ctx.globalCompositeOperation = 'source-over';
+
+    // Shielder aura: translucent blue circle with radial gradient and pulsing edge
+    if (enemy.enemyType === 'shielder' && enemy.shieldAuraRadius) {
+      const auraRadius = enemy.shieldAuraRadius + Math.sin(gameTime * 2) * 5;
+      const gradient = ctx.createRadialGradient(x, y, 0, x, y, auraRadius);
+      gradient.addColorStop(0, 'rgba(68, 170, 255, 0)');
+      gradient.addColorStop(0.85, 'rgba(68, 170, 255, 0.04)');
+      gradient.addColorStop(1, 'rgba(68, 170, 255, 0.08)');
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(x, y, auraRadius, 0, Math.PI * 2);
+      ctx.fill();
+      // Thin blue ring at edge
+      ctx.strokeStyle = 'rgba(68, 170, 255, 0.15)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(x, y, auraRadius, 0, Math.PI * 2);
+      ctx.stroke();
+    }
 
     // Reset phantom alpha
     if (enemy.enemyType === 'phantom') {

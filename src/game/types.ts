@@ -30,7 +30,7 @@ export interface Player extends Entity {
   lastDamageTime: number;
 }
 
-export type EnemyType = 'chaser' | 'shooter' | 'swarm' | 'tank' | 'splitter' | 'boss' | 'phantom';
+export type EnemyType = 'chaser' | 'shooter' | 'swarm' | 'tank' | 'splitter' | 'boss' | 'phantom' | 'shielder';
 
 export interface Enemy extends Entity {
   speed: number;
@@ -49,6 +49,7 @@ export interface Enemy extends Entity {
   bossSpawnTimer?: number;
   bossTeleportTimer?: number;
   _spawnedEnemies?: Vector2[]; // temp buffer for harbinger-spawned enemies
+  shieldAuraRadius?: number;
 }
 
 export interface Projectile extends Entity {
