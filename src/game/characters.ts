@@ -72,6 +72,23 @@ const CHARACTERS: CharacterDef[] = [
     unlockCondition: (stats) => stats.gamesPlayed >= 10,
     unlockDescription: 'Play 10 games.',
   },
+  {
+    id: 'arcanist',
+    name: 'Arcanist',
+    description: 'Ability specialist. Shorter cooldowns, fragile.',
+    color: '#ff44aa',
+    glowColor: '#dd2288',
+    icon: '\u{2728}', // sparkles
+    startingAbilityId: 'chain_lightning',
+    baseHealth: 80,
+    baseSpeed: 190,
+    baseArmor: 0,
+    damageMultiplier: 1.25,
+    xpMultiplier: 0.9,
+    healthRegen: 0,
+    unlockCondition: (stats) => stats.totalKills >= 2000 && stats.gamesPlayed >= 20,
+    unlockDescription: 'Reach 2,000 kills and play 20 games.',
+  },
 ];
 
 export function getCharacters(): CharacterDef[] {

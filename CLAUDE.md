@@ -28,7 +28,7 @@
 - `achievements.ts` — 40 achievements, 4 tiers (bronze/silver/gold/platinum)
 - `stats.ts` — Persistent lifetime stats
 - `meta.ts` — Meta-progression currency and upgrades
-- `characters.ts` — 3 playable characters with unique stats
+- `characters.ts` — 4 playable characters with unique stats (Void Walker, Phantom, Sentinel, Arcanist)
 - `daily.ts` — Daily challenge system with modifiers
 - `settings.ts` — Game settings persistence
 - `difficulty.ts` — 4 difficulty modes (Easy/Normal/Hard/Nightmare) with multipliers

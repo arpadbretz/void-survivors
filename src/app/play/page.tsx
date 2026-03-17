@@ -261,6 +261,13 @@ export default function PlayPage() {
   // Share score state
   const [shareStatus, setShareStatus] = useState<"idle" | "shared" | "copied">("idle");
 
+  // Player name prompt modal state (shown on first game over)
+  const [showNamePrompt, setShowNamePrompt] = useState(false);
+  const [pendingNameInput, setPendingNameInput] = useState("");
+
+  // Global leaderboard rank from score submission
+  const [globalRank, setGlobalRank] = useState<{ rank: number; total: number } | null>(null);
+
   // -----------------------------------------------------------------------
   // Load high scores, achievements, and stats on mount
   // -----------------------------------------------------------------------
@@ -538,15 +545,32 @@ export default function PlayPage() {
     }
 
     // Submit to global leaderboard
+    setGlobalRank(null);
     if (playerName && stats.score > 0) {
-      fetch("/api/leaderboard", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: playerName, score: stats.score }),
-      }).catch(() => {});
+      try {
+        const res = await fetch("/api/leaderboard", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: playerName, score: stats.score }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.rank != null && data.totalPlayers != null) {
+            setGlobalRank({ rank: data.rank, total: data.totalPlayers });
+          }
+        }
+      } catch {
+        // silently fail
+      }
     }
 
     setScreen("gameover");
+
+    // Show name prompt on first game over if no player name is set
+    if (!playerName) {
+      setShowNamePrompt(true);
+      setPendingNameInput("");
+    }
   }, [isDailyMode, dailyChallenge, playerName]);
 
   // -----------------------------------------------------------------------
@@ -992,6 +1016,22 @@ export default function PlayPage() {
             >
               Survive the void. Become the weapon.
             </p>
+
+            {playerName && (
+              <p
+                style={{
+                  color: "#00f0ff",
+                  fontSize: "0.85rem",
+                  marginTop: 8,
+                  letterSpacing: "0.08em",
+                  fontFamily: "var(--font-geist-mono), monospace",
+                  textShadow: "0 0 6px rgba(0,240,255,0.3)",
+                  opacity: 0.8,
+                }}
+              >
+                Welcome back, {playerName}
+              </p>
+            )}
 
             {/* Difficulty Selector */}
             {difficultyConfigs && (
@@ -2859,7 +2899,9 @@ export default function PlayPage() {
               padding: "0 16px",
             }}
           >
-            {upgradeChoices.map((choice, i) => (
+            {upgradeChoices.map((choice, i) => {
+              const isNew = choice.level === 0;
+              return (
               <button
                 key={choice.id}
                 className="upgrade-card animate-slide-up"
@@ -2869,9 +2911,32 @@ export default function PlayPage() {
                   width: "clamp(200px, 30vw, 240px)",
                   textAlign: "center",
                   borderColor: choice.color,
+                  position: "relative",
                 }}
                 onClick={() => selectUpgrade(i)}
               >
+                {isNew && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: -8,
+                      right: -8,
+                      background: "linear-gradient(135deg, #00f0ff, #00bbdd)",
+                      color: "#000",
+                      fontSize: "0.6rem",
+                      fontWeight: 900,
+                      padding: "2px 8px",
+                      borderRadius: 6,
+                      letterSpacing: "0.12em",
+                      fontFamily: "var(--font-geist-mono), monospace",
+                      boxShadow: "0 0 10px rgba(0,240,255,0.5), 0 0 20px rgba(0,240,255,0.2)",
+                      zIndex: 2,
+                      animation: "pulse 2s ease-in-out infinite",
+                    }}
+                  >
+                    NEW
+                  </div>
+                )}
                 <div style={{ fontSize: "2.5rem", marginBottom: 8 }}>
                   {choice.icon}
                 </div>
@@ -2889,7 +2954,7 @@ export default function PlayPage() {
                   style={{
                     fontSize: "0.8rem",
                     color: "rgba(224,224,240,0.6)",
-                    lineHeight: 1.4,
+                    lineHeight: 1.55,
                     marginBottom: 8,
                   }}
                 >
@@ -2902,8 +2967,11 @@ export default function PlayPage() {
                     fontFamily: "var(--font-geist-mono), monospace",
                   }}
                 >
-                  Lv.{choice.level} → Lv.
-                  {Math.min(choice.level + 1, choice.maxLevel)}
+                  {isNew ? (
+                    <span style={{ color: "#00f0ff", fontWeight: 600 }}>New Ability</span>
+                  ) : (
+                    <>Lv.{choice.level} {"\u2192"} Lv.{Math.min(choice.level + 1, choice.maxLevel)}</>
+                  )}
                 </div>
                 {choice.synergy && (
                   <div
@@ -2924,7 +2992,8 @@ export default function PlayPage() {
                   </div>
                 )}
               </button>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -3709,6 +3778,39 @@ export default function PlayPage() {
               )}
             </div>
 
+            {/* Global Leaderboard Rank */}
+            {globalRank && (
+              <div style={{
+                ...sectionStyle,
+                borderColor: "rgba(255,170,0,0.3)",
+                background: "rgba(255,170,0,0.04)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+                padding: isMobile ? "10px 16px" : "12px 24px",
+              }}>
+                <span style={{ fontSize: "1rem" }}>{"\uD83C\uDFC6"}</span>
+                <span style={{
+                  fontSize: "0.95rem",
+                  fontWeight: 700,
+                  color: "#ffaa00",
+                  fontFamily: mono,
+                  letterSpacing: "0.04em",
+                  textShadow: "0 0 10px rgba(255,170,0,0.4)",
+                }}>
+                  #{globalRank.rank.toLocaleString()}
+                </span>
+                <span style={{
+                  fontSize: "0.8rem",
+                  color: "rgba(224,224,240,0.45)",
+                  fontFamily: mono,
+                }}>
+                  of {globalRank.total.toLocaleString()} players
+                </span>
+              </div>
+            )}
+
             {/* Combat Stats Section */}
             <div style={sectionStyle}>
               <div style={{
@@ -3978,6 +4080,163 @@ export default function PlayPage() {
               )}
             </div>
             <button onClick={() => setScreen("menu")} style={{ padding: "10px 32px", fontSize: "0.9rem", fontWeight: 700, background: "transparent", color: "#00eeff", border: "1px solid rgba(0,238,255,0.3)", borderRadius: 8, cursor: "pointer", fontFamily: "var(--font-geist-mono), monospace", letterSpacing: "0.08em" }}>Back to Menu</button>
+          </div>
+        </div>
+      )}
+
+      {/* ============== Player Name Prompt Modal ============== */}
+      {showNamePrompt && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 40,
+            background: "rgba(5, 5, 12, 0.75)",
+            backdropFilter: "blur(6px)",
+            animation: "fadeIn 0.3s ease-out",
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowNamePrompt(false);
+            }
+          }}
+        >
+          <div
+            style={{
+              background: "rgba(10, 10, 22, 0.95)",
+              border: "1px solid rgba(0,240,255,0.25)",
+              borderRadius: 16,
+              padding: "32px 36px",
+              maxWidth: 380,
+              width: "90%",
+              textAlign: "center",
+              backdropFilter: "blur(12px)",
+              boxShadow: "0 0 40px rgba(0,240,255,0.08), 0 0 80px rgba(255,0,170,0.04)",
+              animation: "scaleIn 0.3s ease-out",
+            }}
+          >
+            <div style={{
+              fontSize: "1.6rem",
+              marginBottom: 8,
+            }}>
+              {"\uD83C\uDFAE"}
+            </div>
+            <h3 style={{
+              fontSize: "1.2rem",
+              fontWeight: 800,
+              color: "#00f0ff",
+              letterSpacing: "0.1em",
+              marginBottom: 8,
+              textShadow: "0 0 10px rgba(0,240,255,0.4)",
+            }}>
+              ENTER YOUR NAME
+            </h3>
+            <p style={{
+              fontSize: "0.8rem",
+              color: "rgba(224,224,240,0.5)",
+              lineHeight: 1.5,
+              marginBottom: 20,
+            }}>
+              Set a name to appear on the global leaderboard and track your scores.
+            </p>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const name = pendingNameInput.replace(/[^a-zA-Z0-9_ -]/g, "").trim().substring(0, 20);
+                if (name) {
+                  localStorage.setItem("void-survivors-player-name", name);
+                  setPlayerName(name);
+                  // Submit score with the new name
+                  if (gameOverStats && gameOverStats.score > 0) {
+                    fetch("/api/leaderboard", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ name, score: gameOverStats.score }),
+                    })
+                      .then((res) => res.ok ? res.json() : null)
+                      .then((data) => {
+                        if (data?.rank != null && data?.totalPlayers != null) {
+                          setGlobalRank({ rank: data.rank, total: data.totalPlayers });
+                        }
+                      })
+                      .catch(() => {});
+                  }
+                }
+                setShowNamePrompt(false);
+              }}
+              style={{ display: "flex", flexDirection: "column", gap: 12, alignItems: "center" }}
+            >
+              <input
+                type="text"
+                maxLength={20}
+                placeholder="Your name..."
+                value={pendingNameInput}
+                onChange={(e) => setPendingNameInput(e.target.value)}
+                autoFocus
+                style={{
+                  padding: "10px 16px",
+                  fontSize: "1rem",
+                  background: "rgba(0,0,0,0.5)",
+                  border: "1px solid rgba(0,240,255,0.3)",
+                  borderRadius: 8,
+                  color: "#fff",
+                  fontFamily: "var(--font-geist-mono), monospace",
+                  outline: "none",
+                  width: "100%",
+                  textAlign: "center",
+                  letterSpacing: "0.05em",
+                  transition: "border-color 0.2s",
+                }}
+                onFocus={(e) => { e.currentTarget.style.borderColor = "#00f0ff"; }}
+                onBlur={(e) => { e.currentTarget.style.borderColor = "rgba(0,240,255,0.3)"; }}
+              />
+              <button
+                type="submit"
+                disabled={!pendingNameInput.trim()}
+                style={{
+                  padding: "10px 32px",
+                  fontSize: "0.95rem",
+                  fontWeight: 700,
+                  background: pendingNameInput.trim()
+                    ? "linear-gradient(135deg, rgba(0,240,255,0.2), rgba(0,240,255,0.08))"
+                    : "rgba(255,255,255,0.03)",
+                  border: `1px solid ${pendingNameInput.trim() ? "#00f0ff" : "rgba(224,224,240,0.15)"}`,
+                  borderRadius: 8,
+                  color: pendingNameInput.trim() ? "#00f0ff" : "rgba(224,224,240,0.3)",
+                  cursor: pendingNameInput.trim() ? "pointer" : "default",
+                  fontFamily: "var(--font-geist-mono), monospace",
+                  letterSpacing: "0.1em",
+                  width: "100%",
+                  transition: "all 0.2s",
+                  textShadow: pendingNameInput.trim() ? "0 0 8px rgba(0,240,255,0.4)" : "none",
+                }}
+              >
+                SET NAME
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowNamePrompt(false)}
+                style={{
+                  padding: "8px 24px",
+                  fontSize: "0.78rem",
+                  fontWeight: 400,
+                  background: "none",
+                  border: "none",
+                  color: "rgba(224,224,240,0.35)",
+                  cursor: "pointer",
+                  fontFamily: "var(--font-geist-mono), monospace",
+                  letterSpacing: "0.08em",
+                  transition: "color 0.2s",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = "rgba(224,224,240,0.6)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(224,224,240,0.35)"; }}
+              >
+                Skip — play anonymously
+              </button>
+            </form>
           </div>
         </div>
       )}

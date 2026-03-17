@@ -649,6 +649,61 @@ function speedBoost(): Ability {
   };
 }
 
+function plasmaWave(): Ability {
+  return {
+    id: 'plasma_wave',
+    name: 'Plasma Wave',
+    description: 'Periodic shockwave damages all nearby enemies.',
+    icon: '🌊',
+    level: 1,
+    maxLevel: 5,
+    color: '#ff2288',
+    cooldown: 4.0,
+    lastUsed: -999,
+    onUpdate(player, enemies, _proj, particles, dt, gameTime) {
+      const cd = Math.max(2.0, this.cooldown - this.level * 0.4);
+      if (gameTime - this.lastUsed < cd) return [];
+      this.lastUsed = gameTime;
+
+      const radius = 120 + this.level * 25;
+      const damage = 15 + this.level * 8;
+
+      // Evolved: Supernova — double radius, 3x damage, stuns briefly
+      const effectiveRadius = this.evolved ? radius * 2 : radius;
+      const effectiveDamage = this.evolved ? damage * 3 : damage;
+
+      // Damage all enemies within radius
+      for (const enemy of enemies) {
+        if (!enemy.active) continue;
+        const dist = distance(player.pos, enemy.pos);
+        if (dist < effectiveRadius + enemy.radius) {
+          // Damage falls off linearly with distance
+          const falloff = 1 - (dist / (effectiveRadius + enemy.radius)) * 0.5;
+          enemy.health -= Math.floor(effectiveDamage * falloff);
+          // Visual hit feedback
+          particles.emit(enemy.pos.x, enemy.pos.y, 2, this.evolved ? '#ff88cc' : '#ff2288', 30, 0.2);
+        }
+      }
+
+      // Expanding ring particles
+      const ringCount = this.evolved ? 24 : 16;
+      for (let i = 0; i < ringCount; i++) {
+        const a = (i / ringCount) * Math.PI * 2;
+        particles.emit(
+          player.pos.x + Math.cos(a) * 20,
+          player.pos.y + Math.sin(a) * 20,
+          1,
+          this.evolved ? '#ff88cc' : '#ff2288',
+          effectiveRadius * 2,
+          0.5
+        );
+      }
+
+      return [];
+    },
+  };
+}
+
 // ── Registry ────────────────────────────────────────────────────
 
 type AbilityFactory = () => Ability;
@@ -664,6 +719,7 @@ const ABILITY_REGISTRY: AbilityFactory[] = [
   xpMagnet,
   speedBoost,
   gravityWell,
+  plasmaWave,
 ];
 
 // ── Public API ──────────────────────────────────────────────────
@@ -744,6 +800,7 @@ const EVOLUTION_MAP: Record<string, { name: string; icon: string; color: string 
   chain_lightning: { name: 'Thunder Storm', icon: '🌩️', color: '#ffffff' },
   missile_swarm: { name: 'Void Artillery', icon: '☄️', color: '#ff0044' },
   gravity_well: { name: 'Singularity', icon: '🕳️', color: '#440088' },
+  plasma_wave: { name: 'Supernova', icon: '💥', color: '#ff88cc' },
 };
 
 export function applyUpgradeChoice(player: Player, choice: Ability): void {
@@ -794,6 +851,8 @@ export function getAbilityDescription(ability: Ability, level: number): string {
         return `EVOLVED: Void Artillery — 8 massive missiles, 100 damage each. 2.0s cooldown.`;
       case 'gravity_well':
         return `EVOLVED: Singularity — 2 vortexes simultaneously, double pull strength and damage. Dark energy field.`;
+      case 'plasma_wave':
+        return `EVOLVED: Supernova — Massive shockwave (2x radius), 3x damage. Obliterates everything nearby.`;
     }
   }
 
@@ -818,6 +877,8 @@ export function getAbilityDescription(ability: Ability, level: number): string {
       return `Movement speed +${level * 25}.`;
     case 'gravity_well':
       return `Creates a vortex pulling enemies in. ${(3 + (level - 1) * 0.5).toFixed(1)}s duration, ${80 + (level - 1) * 20}px radius, ${2 + (level - 1)} tick damage.`;
+    case 'plasma_wave':
+      return `Shockwave hits all enemies within ${120 + level * 25}px. ${15 + level * 8} damage, ${(Math.max(2.0, 4.0 - level * 0.4)).toFixed(1)}s cooldown.`;
     default:
       return ability.description;
   }
@@ -891,6 +952,18 @@ export const SYNERGY_DEFINITIONS: Synergy[] = [
     ],
     icon: '☠️',
     color: '#9944ff',
+  },
+  {
+    id: 'nova_cascade',
+    name: 'Nova Cascade',
+    description: 'Radial Shot + Plasma Wave: +30% damage, -15% cooldown',
+    requiredAbilities: ['radial_shot', 'plasma_wave'],
+    bonuses: [
+      { type: 'damage_mult', value: 1.30 },
+      { type: 'cooldown_mult', value: 0.85 },
+    ],
+    icon: '🔥',
+    color: '#ff4466',
   },
 ];
 
