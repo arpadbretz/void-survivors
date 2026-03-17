@@ -88,3 +88,12 @@
 - Edge runtime for OG image generation
 - Service worker (`/sw.js`) registered for offline PWA support
 - PWA manifest at `/manifest.json`
+
+## Global Leaderboard Setup
+The leaderboard API (`/api/leaderboard`) requires Upstash Redis (free tier: 10K commands/day).
+1. Create a free database at https://console.upstash.com
+2. Copy REST URL and REST Token
+3. Add env vars in Vercel dashboard or CLI:
+   - `UPSTASH_REDIS_REST_URL`
+   - `UPSTASH_REDIS_REST_TOKEN`
+4. Redeploy — leaderboard activates automatically

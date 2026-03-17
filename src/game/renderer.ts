@@ -112,6 +112,9 @@ export class Renderer {
   private tutorialHints: { text: string; time: number; duration: number }[] = [];
   private tutorialShown: Set<string> = new Set();
 
+  // Synergy notification system
+  private synergyNotifications: { icon: string; name: string; description: string; color: string; time: number; duration: number }[] = [];
+
   // Kill counter flash state
   private killFlashEntries: { count: number; time: number }[] = [];
 
@@ -600,6 +603,81 @@ export class Renderer {
     this.drawPolygon(ctx, x, y, r * 0.5, 6, '#ffffff', -gameTime * 0.8);
 
     ctx.globalCompositeOperation = 'source-over';
+  }
+
+  // ── Orbit Shield Visual ────────────────────────────────────────
+
+  drawOrbitShield(player: Player, abilities: Ability[], gameTime: number): void {
+    const shield = abilities.find(a => a.id === 'orbit_shield');
+    if (!shield) return;
+
+    const ctx = this.ctx;
+    const orbCount = 2 + shield.level;
+    const orbitRadius = 60 + shield.level * 10;
+    const isEvolved = shield.evolved;
+
+    // Draw orbit ring (faint dashed circle)
+    ctx.save();
+    ctx.strokeStyle = isEvolved ? 'rgba(0, 240, 255, 0.08)' : 'rgba(255, 221, 0, 0.08)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([8, 12]);
+    ctx.beginPath();
+    ctx.arc(player.pos.x, player.pos.y, orbitRadius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+
+    // Draw each orb
+    for (let i = 0; i < orbCount; i++) {
+      const a = gameTime * 3 + (i / orbCount) * Math.PI * 2;
+      const ox = player.pos.x + Math.cos(a) * orbitRadius;
+      const oy = player.pos.y + Math.sin(a) * orbitRadius;
+      const orbRadius = isEvolved ? 10 : 7;
+      const orbColor = isEvolved ? '#00f0ff' : '#ffdd00';
+      const glowColor = isEvolved ? 'rgba(0, 240, 255,' : 'rgba(255, 221, 0,';
+
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+
+      // Outer glow
+      const glow = ctx.createRadialGradient(ox, oy, 0, ox, oy, orbRadius * 3);
+      glow.addColorStop(0, `${glowColor} 0.25)`);
+      glow.addColorStop(1, `${glowColor} 0)`);
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(ox, oy, orbRadius * 3, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Orb body
+      const bodyGrad = ctx.createRadialGradient(ox, oy, 0, ox, oy, orbRadius);
+      bodyGrad.addColorStop(0, '#ffffff');
+      bodyGrad.addColorStop(0.4, orbColor);
+      bodyGrad.addColorStop(1, `${glowColor} 0.4)`);
+      ctx.fillStyle = bodyGrad;
+      ctx.beginPath();
+      ctx.arc(ox, oy, orbRadius, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Bright core
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+      ctx.beginPath();
+      ctx.arc(ox, oy, orbRadius * 0.35, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Sparkle trail (small dots behind the orb)
+      for (let t = 1; t <= 3; t++) {
+        const trailA = a - t * 0.15;
+        const tx = player.pos.x + Math.cos(trailA) * orbitRadius;
+        const ty = player.pos.y + Math.sin(trailA) * orbitRadius;
+        ctx.fillStyle = `${glowColor} ${0.3 - t * 0.08})`;
+        ctx.beginPath();
+        ctx.arc(tx, ty, orbRadius * (0.6 - t * 0.12), 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.restore();
+    }
   }
 
   // ── Enemies ───────────────────────────────────────────────────
@@ -1861,11 +1939,17 @@ export class Renderer {
       }
     }
 
+    // Synergy icons above ability bar
+    this.drawSynergyIcons(state);
+
     // Wave announcement banner
     this.drawWaveAnnouncement();
 
     // Tutorial hints
     this.drawTutorialHints();
+
+    // Synergy notifications
+    this.drawSynergyNotifications();
   }
 
   private drawAbilityIcons(abilities: Ability[], gameTime: number): void {
@@ -2082,6 +2166,135 @@ export class Renderer {
 
       ctx.restore();
       offsetY += 40;
+    }
+  }
+
+  // ── Synergy Notifications ────────────────────────────────────
+
+  showSynergyNotification(icon: string, name: string, description: string, color: string): void {
+    this.synergyNotifications.push({
+      icon,
+      name,
+      description,
+      color,
+      time: performance.now() / 1000,
+      duration: 5,
+    });
+  }
+
+  private drawSynergyNotifications(): void {
+    const now = performance.now() / 1000;
+    this.synergyNotifications = this.synergyNotifications.filter(n => now - n.time < n.duration);
+
+    const ctx = this.ctx;
+    let offsetY = 0;
+
+    for (const notif of this.synergyNotifications) {
+      const elapsed = now - notif.time;
+      const fadeIn = Math.min(1, elapsed / 0.4);
+      const fadeOut = elapsed > notif.duration - 0.8 ? Math.max(0, (notif.duration - elapsed) / 0.8) : 1;
+      const alpha = fadeIn * fadeOut;
+
+      // Slide in from top
+      const slideOffset = (1 - fadeIn) * -40;
+
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.textAlign = 'center';
+
+      // Background pill — golden/synergy themed
+      const headerText = `SYNERGY: ${notif.name}`;
+      ctx.font = 'bold 14px monospace';
+      const headerWidth = ctx.measureText(headerText).width;
+      ctx.font = '11px monospace';
+      const descWidth = ctx.measureText(notif.description).width;
+      const pillWidth = Math.max(headerWidth, descWidth) + 60;
+      const pillHeight = 52;
+      const pillX = this.width / 2 - pillWidth / 2;
+      const pillY = this.height * 0.25 + offsetY + slideOffset;
+
+      // Dark background with golden border
+      ctx.fillStyle = 'rgba(10, 8, 2, 0.85)';
+      ctx.beginPath();
+      ctx.roundRect(pillX, pillY, pillWidth, pillHeight, 12);
+      ctx.fill();
+
+      ctx.strokeStyle = notif.color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.roundRect(pillX, pillY, pillWidth, pillHeight, 12);
+      ctx.stroke();
+
+      // Inner golden glow line
+      ctx.strokeStyle = `rgba(255, 215, 0, ${0.3 * alpha})`;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(pillX + 2, pillY + 2, pillWidth - 4, pillHeight - 4, 10);
+      ctx.stroke();
+
+      // Icon
+      ctx.font = '18px serif';
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(notif.icon, pillX + 22, pillY + 22);
+
+      // Header: "SYNERGY: Name"
+      ctx.font = 'bold 14px monospace';
+      ctx.fillStyle = '#ffd700';
+      ctx.fillText(headerText, this.width / 2 + 10, pillY + 20);
+
+      // Description
+      ctx.font = '11px monospace';
+      ctx.fillStyle = notif.color;
+      ctx.fillText(notif.description, this.width / 2 + 10, pillY + 40);
+
+      ctx.restore();
+      offsetY += pillHeight + 8;
+    }
+  }
+
+  private drawSynergyIcons(state: GameState): void {
+    if (!state.activeSynergies || state.activeSynergies.length === 0) return;
+
+    const ctx = this.ctx;
+    const iconSize = 28;
+    const gap = 6;
+    const synergies = state.activeSynergies;
+    const totalWidth = synergies.length * (iconSize + gap) - gap;
+    const startX = this.width / 2 - totalWidth / 2;
+    // Position just above the ability icons bar
+    const y = this.height - 40 - 15 - iconSize - 10;
+
+    for (let i = 0; i < synergies.length; i++) {
+      const as = synergies[i];
+      const x = startX + i * (iconSize + gap);
+
+      // Background with golden tint
+      ctx.fillStyle = 'rgba(20, 16, 4, 0.7)';
+      ctx.fillRect(x, y, iconSize, iconSize);
+
+      // Golden border
+      ctx.strokeStyle = '#ffd700';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(x, y, iconSize, iconSize);
+
+      // Corner accents
+      ctx.strokeStyle = as.synergy.color;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x + 1, y + 1, iconSize - 2, iconSize - 2);
+
+      // Icon
+      ctx.font = '14px serif';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(as.synergy.icon, x + iconSize / 2, y + iconSize / 2 + 5);
+    }
+
+    // Label above synergy icons
+    if (synergies.length > 0) {
+      ctx.font = '9px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = 'rgba(255, 215, 0, 0.5)';
+      ctx.fillText('SYNERGIES', this.width / 2, y - 3);
     }
   }
 

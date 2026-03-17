@@ -38,6 +38,9 @@ import {
   createStarterAbility,
   createAutoCannonAbility,
   createAbilityById,
+  detectActiveSynergies,
+  computeSynergyBonuses,
+  getSynergyCompletions,
 } from './abilities';
 import { AudioManager } from './audio';
 import { loadMeta, getMetaBonuses, MetaBonuses } from './meta';
@@ -80,6 +83,11 @@ interface EngineCallbacks {
       level: number;
       maxLevel: number;
       color: string;
+      synergy?: {
+        name: string;
+        icon: string;
+        color: string;
+      };
     }[]
   ) => void;
   onGameOver: (stats: {
@@ -281,6 +289,9 @@ export class GameEngine {
     const choice = this.state.upgradeChoices[index];
     applyUpgradeChoice(this.state.player, choice);
 
+    // Check for newly activated synergies
+    this.checkSynergies();
+
     this.state.showUpgradeScreen = false;
     this.state.upgradeChoices = [];
   }
@@ -398,6 +409,7 @@ export class GameEngine {
       camera,
       hazards: [],
       lootDrops: [],
+      activeSynergies: [],
     };
 
     // Apply meta-progression bonuses
@@ -608,8 +620,9 @@ export class GameEngine {
           const pullStrength = 200 * (1 - dist / proj.radius);
           enemy.vel.x += dirToWell.x * pullStrength * dt;
           enemy.vel.y += dirToWell.y * pullStrength * dt;
-          // Tick damage
-          enemy.health -= proj.damage * dt;
+          // Tick damage (with synergy bonus)
+          const gwSynergyBonuses = computeSynergyBonuses(this.state.activeSynergies);
+          enemy.health -= proj.damage * dt * gwSynergyBonuses.damageMult;
           if (enemy.health <= 0) {
             this.killEnemy(enemy);
           }
@@ -755,8 +768,10 @@ export class GameEngine {
         '#88eeff'
       );
     } else {
-      p.vel.x = dx * p.speed;
-      p.vel.y = dy * p.speed;
+      const speedSynBonuses = computeSynergyBonuses(this.state.activeSynergies);
+      const effectiveSpeed = p.speed * speedSynBonuses.speedMult;
+      p.vel.x = dx * effectiveSpeed;
+      p.vel.y = dy * effectiveSpeed;
     }
 
     p.pos.x += p.vel.x * dt;
@@ -769,17 +784,23 @@ export class GameEngine {
       this.particles.emitTrail(p.pos.x, p.pos.y, '#00aacc');
     }
 
-    // Passive health regeneration: 1 HP per 3 seconds + character bonus
+    // Passive health regeneration: 1 HP per 3 seconds + character bonus + synergy regen
     if (p.health < p.maxHealth) {
       const baseRegen = 1 / 3; // HP per second
       const charRegen = this.characterDef.healthRegen; // additional HP per second
-      p.health = Math.min(p.maxHealth, p.health + (baseRegen + charRegen) * dt);
+      const synBonuses = computeSynergyBonuses(this.state.activeSynergies);
+      p.health = Math.min(p.maxHealth, p.health + (baseRegen + charRegen + synBonuses.healthRegen) * dt);
     }
   }
 
   private updateAbilities(dt: number): void {
     const s = this.state;
+    const synBonuses = computeSynergyBonuses(s.activeSynergies);
     for (const ability of s.player.abilities) {
+      // Apply synergy cooldown multiplier temporarily
+      const originalCooldown = ability.cooldown;
+      ability.cooldown *= synBonuses.cooldownMult;
+
       const newProj = ability.onUpdate(
         s.player,
         s.enemies,
@@ -788,6 +809,10 @@ export class GameEngine {
         dt,
         s.time
       );
+
+      // Restore original cooldown
+      ability.cooldown = originalCooldown;
+
       if (newProj && newProj.length > 0) {
         s.projectiles.push(...newProj);
       }
@@ -836,7 +861,8 @@ export class GameEngine {
       if (dist < p.radius + orb.radius) {
         orb.active = false;
         const dailyXpMult = getModifierValue(this.dailyModifiers, 'xp_mult');
-        const xpGain = Math.floor(orb.value * this.metaBonuses.xpMultiplier * this.characterDef.xpMultiplier * dailyXpMult * this.difficultyConfig.xpMult);
+        const xpSynergyBonuses = computeSynergyBonuses(this.state.activeSynergies);
+        const xpGain = Math.floor(orb.value * this.metaBonuses.xpMultiplier * this.characterDef.xpMultiplier * dailyXpMult * this.difficultyConfig.xpMult * xpSynergyBonuses.xpMult);
         p.xp += xpGain;
         this.xpCollected += xpGain;
         this.state.score += Math.floor(orb.value * this.difficultyConfig.scoreMult);
@@ -963,7 +989,8 @@ export class GameEngine {
         const dist = distance(proj.pos, enemy.pos);
         if (dist < proj.radius + enemy.radius) {
           const dailyDamageMult = getModifierValue(this.dailyModifiers, 'damage_mult');
-          const actualDamage = Math.floor(proj.damage * this.metaBonuses.damageMultiplier * this.characterDef.damageMultiplier * dailyDamageMult);
+          const synergyBonuses = computeSynergyBonuses(this.state.activeSynergies);
+          const actualDamage = Math.floor(proj.damage * this.metaBonuses.damageMultiplier * this.characterDef.damageMultiplier * dailyDamageMult * synergyBonuses.damageMult);
           enemy.health -= actualDamage;
           this.damageDealt += actualDamage;
           this.particles.emitDamageNumber(
@@ -1349,16 +1376,57 @@ export class GameEngine {
 
       // Notify React UI
       if (this.callbacks) {
+        const currentAbilityIds = this.state.player.abilities.map(a => a.id);
         this.callbacks.onLevelUp(
-          choices.map((c) => ({
-            id: c.id,
-            name: c.name,
-            description: getAbilityDescription(c, c.level),
-            icon: c.icon,
-            level: c.level,
-            maxLevel: c.maxLevel,
-            color: c.color,
-          }))
+          choices.map((c) => {
+            const completions = getSynergyCompletions(currentAbilityIds, c.id);
+            return {
+              id: c.id,
+              name: c.name,
+              description: getAbilityDescription(c, c.level),
+              icon: c.icon,
+              level: c.level,
+              maxLevel: c.maxLevel,
+              color: c.color,
+              synergy: completions.length > 0 ? {
+                name: completions[0].name,
+                icon: completions[0].icon,
+                color: completions[0].color,
+              } : undefined,
+            };
+          })
+        );
+      }
+    }
+  }
+
+  // ── Synergy Detection ──────────────────────────────────────────
+
+  private checkSynergies(): void {
+    const abilityIds = this.state.player.abilities.map(a => a.id);
+    const nowActive = detectActiveSynergies(abilityIds);
+    const previousIds = new Set(this.state.activeSynergies.map(as => as.synergy.id));
+
+    // Find newly activated synergies
+    for (const syn of nowActive) {
+      if (!previousIds.has(syn.id)) {
+        // New synergy activated!
+        this.state.activeSynergies.push({
+          synergy: syn,
+          activatedAt: this.state.time,
+        });
+
+        // Show notification via renderer
+        this.renderer?.showSynergyNotification(syn.icon, syn.name, syn.description, syn.color);
+
+        // Play achievement sound
+        this.audio.playAchievement();
+
+        // Emit particles at player
+        this.particles.emit(
+          this.state.player.pos.x,
+          this.state.player.pos.y,
+          20, syn.color, 120, 0.6
         );
       }
     }
@@ -1467,6 +1535,7 @@ export class GameEngine {
 
     if (s.player.active) {
       r.drawPlayer(s.player, s.time);
+      r.drawOrbitShield(s.player, s.player.abilities, s.time);
     }
 
     const activeParticles = this.particles.getParticles();

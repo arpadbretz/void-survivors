@@ -8,6 +8,8 @@ import {
   Enemy,
   Projectile,
   ParticleSystemInterface,
+  Synergy,
+  ActiveSynergy,
 } from './types';
 import { distance, angle, normalize, sub, randomAngle, randomRange } from './math';
 
@@ -819,4 +821,139 @@ export function getAbilityDescription(ability: Ability, level: number): string {
     default:
       return ability.description;
   }
+}
+
+// ── Synergy Definitions ──────────────────────────────────────────
+
+export const SYNERGY_DEFINITIONS: Synergy[] = [
+  {
+    id: 'elemental_storm',
+    name: 'Elemental Storm',
+    description: 'Lightning + Frost: +25% damage to all abilities',
+    requiredAbilities: ['chain_lightning', 'frost_aura'],
+    bonuses: [{ type: 'damage_mult', value: 1.25 }],
+    icon: '🌪️',
+    color: '#66ddff',
+  },
+  {
+    id: 'bullet_hell',
+    name: 'Bullet Hell',
+    description: 'Radial Shot + Auto Cannon: -20% cooldown on all abilities',
+    requiredAbilities: ['radial_shot', 'auto_cannon'],
+    bonuses: [{ type: 'cooldown_mult', value: 0.80 }],
+    icon: '💢',
+    color: '#ff4488',
+  },
+  {
+    id: 'artillery_command',
+    name: 'Artillery Command',
+    description: 'Missiles + Gravity Well: +30% damage, +15% range',
+    requiredAbilities: ['missile_swarm', 'gravity_well'],
+    bonuses: [
+      { type: 'damage_mult', value: 1.30 },
+      { type: 'range_mult', value: 1.15 },
+    ],
+    icon: '🎯',
+    color: '#ff8800',
+  },
+  {
+    id: 'cosmic_barrier',
+    name: 'Cosmic Barrier',
+    description: 'Orbit Shield + Frost Aura: +30% range, +2 HP/s regen',
+    requiredAbilities: ['orbit_shield', 'frost_aura'],
+    bonuses: [
+      { type: 'range_mult', value: 1.30 },
+      { type: 'health_regen', value: 2 },
+    ],
+    icon: '🔮',
+    color: '#aaddff',
+  },
+  {
+    id: 'rapid_fire',
+    name: 'Rapid Fire',
+    description: 'Auto Cannon + XP Magnet: -15% cooldown, +10% XP gain',
+    requiredAbilities: ['auto_cannon', 'xp_magnet'],
+    bonuses: [
+      { type: 'cooldown_mult', value: 0.85 },
+      { type: 'xp_mult', value: 1.10 },
+    ],
+    icon: '⚡',
+    color: '#ffcc00',
+  },
+  {
+    id: 'death_zone',
+    name: 'Death Zone',
+    description: 'Gravity Well + Chain Lightning: +20% damage, +10% speed',
+    requiredAbilities: ['gravity_well', 'chain_lightning'],
+    bonuses: [
+      { type: 'damage_mult', value: 1.20 },
+      { type: 'speed_mult', value: 1.10 },
+    ],
+    icon: '☠️',
+    color: '#9944ff',
+  },
+];
+
+/**
+ * Detect which synergies are active given the player's current abilities.
+ */
+export function detectActiveSynergies(abilityIds: string[]): Synergy[] {
+  const owned = new Set(abilityIds);
+  return SYNERGY_DEFINITIONS.filter(syn =>
+    syn.requiredAbilities.every(id => owned.has(id))
+  );
+}
+
+/**
+ * Compute aggregate synergy multipliers from active synergies.
+ */
+export function computeSynergyBonuses(activeSynergies: ActiveSynergy[]): {
+  damageMult: number;
+  cooldownMult: number;
+  rangeMult: number;
+  healthRegen: number;
+  speedMult: number;
+  xpMult: number;
+} {
+  let damageMult = 1;
+  let cooldownMult = 1;
+  let rangeMult = 1;
+  let healthRegen = 0;
+  let speedMult = 1;
+  let xpMult = 1;
+
+  for (const as of activeSynergies) {
+    for (const bonus of as.synergy.bonuses) {
+      switch (bonus.type) {
+        case 'damage_mult': damageMult *= bonus.value; break;
+        case 'cooldown_mult': cooldownMult *= bonus.value; break;
+        case 'range_mult': rangeMult *= bonus.value; break;
+        case 'health_regen': healthRegen += bonus.value; break;
+        case 'speed_mult': speedMult *= bonus.value; break;
+        case 'xp_mult': xpMult *= bonus.value; break;
+      }
+    }
+  }
+
+  return { damageMult, cooldownMult, rangeMult, healthRegen, speedMult, xpMult };
+}
+
+/**
+ * Check which synergies would be completed if a given ability were acquired.
+ * Returns synergies that are NOT currently active but WOULD become active.
+ */
+export function getSynergyCompletions(currentAbilityIds: string[], candidateId: string): Synergy[] {
+  const currentSet = new Set(currentAbilityIds);
+  // Already active synergies
+  const alreadyActive = new Set(
+    SYNERGY_DEFINITIONS
+      .filter(syn => syn.requiredAbilities.every(id => currentSet.has(id)))
+      .map(syn => syn.id)
+  );
+  // Check with candidate added
+  currentSet.add(candidateId);
+  return SYNERGY_DEFINITIONS.filter(syn =>
+    !alreadyActive.has(syn.id) &&
+    syn.requiredAbilities.every(id => currentSet.has(id))
+  );
 }

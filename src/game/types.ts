@@ -108,6 +108,28 @@ export interface Ability {
   onAcquire?: (player: Player) => void;
 }
 
+export type SynergyBonusType = 'damage_mult' | 'cooldown_mult' | 'range_mult' | 'health_regen' | 'speed_mult' | 'xp_mult';
+
+export interface SynergyBonus {
+  type: SynergyBonusType;
+  value: number;
+}
+
+export interface Synergy {
+  id: string;
+  name: string;
+  description: string;
+  requiredAbilities: string[];
+  bonuses: SynergyBonus[];
+  icon: string;
+  color: string;
+}
+
+export interface ActiveSynergy {
+  synergy: Synergy;
+  activatedAt: number; // gameTime when activated
+}
+
 export interface ParticleSystemInterface {
   emit: (x: number, y: number, count: number, color: string, speed: number, life: number) => void;
   emitExplosion: (x: number, y: number, color: string, count?: number) => void;
@@ -159,6 +181,7 @@ export interface GameState {
   combo?: number;
   comboTimer?: number;
   comboMultiplier?: number;
+  activeSynergies: ActiveSynergy[];
 }
 
 export interface LootDrop {

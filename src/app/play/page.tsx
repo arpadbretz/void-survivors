@@ -102,6 +102,11 @@ interface UpgradeChoice {
   level: number;
   maxLevel: number;
   color: string;
+  synergy?: {
+    name: string;
+    icon: string;
+    color: string;
+  };
 }
 
 // We expect GameEngine from @/game/engine to follow this interface:
@@ -2900,6 +2905,24 @@ export default function PlayPage() {
                   Lv.{choice.level} → Lv.
                   {Math.min(choice.level + 1, choice.maxLevel)}
                 </div>
+                {choice.synergy && (
+                  <div
+                    style={{
+                      marginTop: 8,
+                      padding: "4px 10px",
+                      background: "rgba(255, 215, 0, 0.12)",
+                      border: `1px solid ${choice.synergy.color}`,
+                      borderRadius: 6,
+                      fontSize: "0.7rem",
+                      fontWeight: 700,
+                      color: "#ffd700",
+                      fontFamily: "var(--font-geist-mono), monospace",
+                      letterSpacing: "0.05em",
+                    }}
+                  >
+                    {choice.synergy.icon} SYNERGY: {choice.synergy.name}
+                  </div>
+                )}
               </button>
             ))}
           </div>
