@@ -58,6 +58,9 @@ interface EngineCallbacks {
     time: number;
     paused: boolean;
     abilities: { icon: string; name: string; level: number; color: string }[];
+    combo: number;
+    maxCombo: number;
+    dashCooldown: number;
   }) => void;
   onLevelUp: (
     choices: {
@@ -76,6 +79,7 @@ interface EngineCallbacks {
     level: number;
     enemiesKilled: number;
     wavesSurvived: number;
+    maxCombo: number;
   }) => void;
 }
 
@@ -98,6 +102,20 @@ export class GameEngine {
 
   private enemiesKilled: number = 0;
   private lastHudUpdate: number = 0;
+
+  // Combo / kill streak tracking
+  private comboCount: number = 0;
+  private comboTimer: number = 0;
+  private maxCombo: number = 0;
+  private readonly COMBO_TIMEOUT = 2.0;
+
+  // Dash state
+  private dashCooldown: number = 0;
+  private dashTimer: number = 0;
+  private dashDirection: { x: number; y: number } = { x: 0, y: 0 };
+  private readonly DASH_SPEED = 800;
+  private readonly DASH_DURATION = 0.15; // seconds
+  private readonly DASH_COOLDOWN = 1.5; // seconds
 
   // Bound event handlers for cleanup
   private boundKeyDown: ((e: KeyboardEvent) => void) | null = null;
@@ -266,6 +284,12 @@ export class GameEngine {
 
     this.enemiesKilled = 0;
     this.lastHudUpdate = 0;
+    this.comboCount = 0;
+    this.comboTimer = 0;
+    this.maxCombo = 0;
+    this.dashCooldown = 0;
+    this.dashTimer = 0;
+    this.dashDirection = { x: 0, y: 0 };
     this.enemyManager.reset();
 
     // Reset input
@@ -343,6 +367,14 @@ export class GameEngine {
   private update(dt: number): void {
     const s = this.state;
     s.time += dt;
+
+    // Combo timer decay
+    if (this.comboTimer > 0) {
+      this.comboTimer -= dt;
+      if (this.comboTimer <= 0 && this.comboCount > 0) {
+        this.comboCount = 0;
+      }
+    }
 
     // 1. Player movement
     this.updatePlayer(dt);
@@ -427,8 +459,10 @@ export class GameEngine {
       s.xpOrbs = s.xpOrbs.slice(-100);
     }
 
-    // 14. Pass kill count to state for renderer
+    // 14. Pass kill count and combo to state for renderer
     s.enemiesKilled = this.enemiesKilled;
+    s.combo = this.comboCount;
+    s.comboTimer = this.comboTimer;
 
     // 15. Game over
     if (s.player.health <= 0 && !s.gameOver) {
@@ -460,8 +494,26 @@ export class GameEngine {
       dy *= inv;
     }
 
-    p.vel.x = dx * p.speed;
-    p.vel.y = dy * p.speed;
+    // Decrement dash cooldowns
+    this.dashCooldown -= dt;
+    this.dashTimer -= dt;
+
+    // During dash, override velocity with dash speed
+    if (this.dashTimer > 0) {
+      p.vel.x = this.DASH_SPEED * this.dashDirection.x;
+      p.vel.y = this.DASH_SPEED * this.dashDirection.y;
+
+      // Emit extra trail particles during dash
+      this.particles.emitTrail(p.pos.x, p.pos.y, '#00ffff');
+      this.particles.emitTrail(
+        p.pos.x + (Math.random() - 0.5) * 10,
+        p.pos.y + (Math.random() - 0.5) * 10,
+        '#88eeff'
+      );
+    } else {
+      p.vel.x = dx * p.speed;
+      p.vel.y = dy * p.speed;
+    }
 
     p.pos.x += p.vel.x * dt;
     p.pos.y += p.vel.y * dt;
@@ -628,8 +680,35 @@ export class GameEngine {
 
   private killEnemy(enemy: Enemy): void {
     enemy.active = false;
-    this.state.score += enemy.xpValue * 2;
     this.enemiesKilled++;
+
+    // Combo tracking
+    this.comboCount++;
+    this.comboTimer = this.COMBO_TIMEOUT;
+    if (this.comboCount > this.maxCombo) {
+      this.maxCombo = this.comboCount;
+    }
+
+    // Score multiplier based on combo
+    let scoreMultiplier = 1;
+    if (this.comboCount >= 50) scoreMultiplier = 5;
+    else if (this.comboCount >= 20) scoreMultiplier = 3;
+    else if (this.comboCount >= 10) scoreMultiplier = 2;
+    else if (this.comboCount >= 5) scoreMultiplier = 1.5;
+
+    this.state.score += Math.floor(enemy.xpValue * 2 * scoreMultiplier);
+
+    // Combo milestone effects
+    const milestones = [5, 10, 20, 50];
+    if (milestones.includes(this.comboCount)) {
+      this.particles.emitExplosion(
+        this.state.player.pos.x,
+        this.state.player.pos.y,
+        '#ffdd00',
+        20
+      );
+      this.audio.playLevelUp();
+    }
 
     this.particles.emitExplosion(enemy.pos.x, enemy.pos.y, enemy.color, 15);
     this.audio.playExplosion();
@@ -807,6 +886,9 @@ export class GameEngine {
         level: a.level,
         color: a.color,
       })),
+      combo: this.comboCount,
+      maxCombo: this.maxCombo,
+      dashCooldown: Math.max(0, this.dashCooldown),
     });
   }
 
@@ -830,6 +912,7 @@ export class GameEngine {
         level: this.state.player.level,
         enemiesKilled: this.enemiesKilled,
         wavesSurvived: this.state.wave,
+        maxCombo: this.maxCombo,
       });
     }
   }
@@ -926,6 +1009,46 @@ export class GameEngine {
         } else {
           this.audio.mute();
           this.soundEnabled = false;
+        }
+        break;
+      case 'Space':
+        if (
+          this.dashCooldown <= 0 &&
+          (this.input.up || this.input.down || this.input.left || this.input.right)
+        ) {
+          // Calculate dash direction from current input
+          let dashDx = 0;
+          let dashDy = 0;
+          if (this.input.up) dashDy -= 1;
+          if (this.input.down) dashDy += 1;
+          if (this.input.left) dashDx -= 1;
+          if (this.input.right) dashDx += 1;
+          const dashLen = Math.sqrt(dashDx * dashDx + dashDy * dashDy);
+          if (dashLen > 0) {
+            dashDx /= dashLen;
+            dashDy /= dashLen;
+          }
+
+          this.dashTimer = this.DASH_DURATION;
+          this.dashCooldown = this.DASH_COOLDOWN;
+          this.dashDirection = { x: dashDx, y: dashDy };
+
+          // Grant invincibility during dash
+          this.state.player.invincibleUntil = Math.max(
+            this.state.player.invincibleUntil,
+            this.state.time + this.DASH_DURATION
+          );
+
+          // Sound and particle burst
+          this.audio.playShoot();
+          this.particles.emit(
+            this.state.player.pos.x,
+            this.state.player.pos.y,
+            8,
+            '#00ffff',
+            120,
+            0.3
+          );
         }
         break;
     }

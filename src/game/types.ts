@@ -126,6 +126,8 @@ export interface GameState {
   screenShake: number;
   camera: Camera;
   enemiesKilled?: number;
+  combo?: number;
+  comboTimer?: number;
 }
 
 export interface WaveConfig {

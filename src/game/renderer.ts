@@ -460,6 +460,45 @@ export class Renderer {
     // Minimap
     this.drawMinimap(state, worldSize);
 
+    // Combo counter
+    const combo = state.combo ?? 0;
+    if (combo >= 2) {
+      const comboTimer = state.comboTimer ?? 0;
+
+      // Color scales with combo
+      let comboColor: string;
+      if (combo >= 50) comboColor = '#ff00ff';
+      else if (combo >= 20) comboColor = '#ff3344';
+      else if (combo >= 10) comboColor = '#ff8800';
+      else if (combo >= 5) comboColor = '#ffdd00';
+      else comboColor = '#ffffff';
+
+      // Size scales with combo
+      let fontSize: number;
+      if (combo >= 50) fontSize = 28;
+      else if (combo >= 20) fontSize = 24;
+      else if (combo >= 10) fontSize = 20;
+      else if (combo >= 5) fontSize = 18;
+      else fontSize = 16;
+
+      // Pulsing scale effect
+      const pulse = 1 + Math.sin(Date.now() * 0.01) * 0.08;
+      const scaledSize = Math.round(fontSize * pulse);
+
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.font = `bold ${scaledSize}px monospace`;
+      ctx.fillStyle = comboColor;
+
+      // Fade out as timer runs low
+      const alpha = comboTimer > 0.5 ? 1 : Math.max(0, comboTimer / 0.5);
+      ctx.globalAlpha = alpha;
+
+      ctx.fillText(`COMBO x${combo}`, this.width / 2, 80);
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    }
+
     // Low health red vignette effect
     if (healthRatio < 0.3 && healthRatio > 0) {
       const intensity = (1 - healthRatio / 0.3) * 0.4;

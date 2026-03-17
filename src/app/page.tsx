@@ -666,6 +666,41 @@ export default function HomePage() {
               Select upgrade
             </span>
           </div>
+          {/* Dash */}
+          <div
+            className="glass"
+            style={{
+              padding: "20px 16px",
+              borderRadius: 12,
+              display: "flex",
+              alignItems: "center",
+              gap: 14,
+            }}
+          >
+            <kbd
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                minWidth: 56,
+                height: 32,
+                padding: "0 10px",
+                borderRadius: 6,
+                border: "1px solid rgba(255, 136, 0, 0.35)",
+                background: "rgba(255, 136, 0, 0.07)",
+                color: "#ff8800",
+                fontSize: "0.7rem",
+                fontWeight: 700,
+                fontFamily: "var(--font-geist-mono), monospace",
+                boxShadow: "0 0 8px rgba(255, 136, 0, 0.15)",
+              }}
+            >
+              SPACE
+            </kbd>
+            <span style={{ color: "rgba(224,224,240,0.6)", fontSize: "0.85rem" }}>
+              Dash
+            </span>
+          </div>
         </div>
       </section>
 

@@ -17,6 +17,9 @@ interface HUDState {
   time: number;
   paused: boolean;
   abilities: { icon: string; name: string; level: number; color: string }[];
+  combo: number;
+  maxCombo: number;
+  dashCooldown: number;
 }
 
 interface GameOverStats {
@@ -25,6 +28,7 @@ interface GameOverStats {
   level: number;
   enemiesKilled: number;
   wavesSurvived: number;
+  maxCombo: number;
 }
 
 type GameScreen = "menu" | "playing" | "paused" | "upgrade" | "gameover";
@@ -125,6 +129,9 @@ export default function PlayPage() {
     time: 0,
     paused: false,
     abilities: [],
+    combo: 0,
+    maxCombo: 0,
+    dashCooldown: 0,
   });
   const [upgradeChoices, setUpgradeChoices] = useState<UpgradeChoice[]>([]);
   const [gameOverStats, setGameOverStats] = useState<GameOverStats | null>(
@@ -546,6 +553,56 @@ export default function PlayPage() {
             {formatTime(hud.time)}
           </div>
 
+          {/* Combo indicator (shown when combo >= 3) */}
+          {hud.combo >= 3 && (
+            <div
+              style={{
+                position: "absolute",
+                top: 48,
+                left: "50%",
+                transform: "translateX(-50%)",
+                fontFamily: "var(--font-geist-mono), monospace",
+                fontSize: hud.combo >= 50 ? "1.4rem" : hud.combo >= 20 ? "1.2rem" : hud.combo >= 10 ? "1.1rem" : "1rem",
+                fontWeight: 900,
+                letterSpacing: "0.12em",
+                color:
+                  hud.combo >= 50
+                    ? "#ff00ff"
+                    : hud.combo >= 20
+                      ? "#ff3344"
+                      : hud.combo >= 10
+                        ? "#ff8800"
+                        : hud.combo >= 5
+                          ? "#ffdd00"
+                          : "#ffffff",
+                textShadow:
+                  hud.combo >= 10
+                    ? `0 0 8px currentColor, 0 0 16px currentColor`
+                    : `0 0 6px currentColor`,
+                zIndex: 11,
+              }}
+            >
+              COMBO x{hud.combo}
+              {hud.combo >= 5 && (
+                <span
+                  style={{
+                    fontSize: "0.7em",
+                    marginLeft: 6,
+                    color: "rgba(255,255,255,0.5)",
+                  }}
+                >
+                  {hud.combo >= 50
+                    ? "5x"
+                    : hud.combo >= 20
+                      ? "3x"
+                      : hud.combo >= 10
+                        ? "2x"
+                        : "1.5x"}
+                </span>
+              )}
+            </div>
+          )}
+
           {/* Top-right: Score + Sound */}
           <div
             className="hud-panel"
@@ -632,6 +689,87 @@ export default function PlayPage() {
               ))}
             </div>
           )}
+
+          {/* Dash cooldown indicator */}
+          <div
+            style={{
+              position: "absolute",
+              bottom: 44,
+              left: "50%",
+              transform: "translateX(-50%)",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 2,
+            }}
+          >
+            <div
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: "50%",
+                position: "relative",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              {/* Background circle */}
+              <svg
+                width={36}
+                height={36}
+                style={{ position: "absolute", top: 0, left: 0 }}
+              >
+                <circle
+                  cx={18}
+                  cy={18}
+                  r={15}
+                  fill="rgba(0,0,0,0.4)"
+                  stroke="rgba(0,240,255,0.2)"
+                  strokeWidth={2}
+                />
+                {/* Cooldown fill arc */}
+                <circle
+                  cx={18}
+                  cy={18}
+                  r={15}
+                  fill="none"
+                  stroke={hud.dashCooldown <= 0 ? "#00f0ff" : "rgba(0,240,255,0.4)"}
+                  strokeWidth={2}
+                  strokeDasharray={2 * Math.PI * 15}
+                  strokeDashoffset={
+                    hud.dashCooldown <= 0
+                      ? 0
+                      : (hud.dashCooldown / 1.5) * 2 * Math.PI * 15
+                  }
+                  transform="rotate(-90 18 18)"
+                  style={{ transition: "stroke-dashoffset 0.1s linear" }}
+                />
+              </svg>
+              <span
+                style={{
+                  position: "relative",
+                  zIndex: 1,
+                  fontSize: "0.7rem",
+                  fontWeight: 700,
+                  color: hud.dashCooldown <= 0 ? "#00f0ff" : "rgba(0,240,255,0.35)",
+                  textShadow: hud.dashCooldown <= 0 ? "0 0 6px #00f0ff" : "none",
+                }}
+              >
+                {hud.dashCooldown <= 0 ? "DASH" : ""}
+              </span>
+            </div>
+            <span
+              style={{
+                fontSize: "0.55rem",
+                letterSpacing: "0.1em",
+                color: "rgba(224,224,240,0.35)",
+                fontFamily: "var(--font-geist-mono), monospace",
+              }}
+            >
+              SPACE
+            </span>
+          </div>
 
           {/* Bottom: XP bar */}
           <div
@@ -968,6 +1106,18 @@ export default function PlayPage() {
                 }}
               >
                 {gameOverStats.wavesSurvived}
+              </span>
+
+              <span style={{ color: "rgba(224,224,240,0.5)" }}>
+                Best Combo
+              </span>
+              <span
+                style={{
+                  color: "#ffdd00",
+                  fontFamily: "var(--font-geist-mono), monospace",
+                }}
+              >
+                {gameOverStats.maxCombo}x
               </span>
             </div>
 
