@@ -395,13 +395,13 @@ export default function HomePage() {
           />
           <FeatureCard
             icon={"👾"}
-            title="7 Enemy Types + Elites"
-            description="Face 7 distinct enemy types including the elusive Phantom, each with dangerous Elite variants. From swarming drones to hulking tanks, every wave tests your reflexes."
+            title="7 Enemy Types + Elites + 3 Boss Variants"
+            description="Face 7 enemy types with Elite variants, plus 3 unique bosses — the towering Titan, the projectile-spewing Harbinger, and the teleporting Nexus. Every wave tests your reflexes."
           />
           <FeatureCard
             icon={"🏆"}
-            title="25 Achievements"
-            description="Track your progress with milestones for kills, waves, combos, and more. How many can you unlock?"
+            title="40 Achievements"
+            description="Track your progress with milestones for kills, waves, combos, boss defeats, and more. How many can you unlock?"
           />
           <FeatureCard
             icon={"✨"}
@@ -412,6 +412,16 @@ export default function HomePage() {
             icon={"🌊"}
             title="Wave Events"
             description="Dynamic wave events including Swarm Rush, Tank Parade, and Speed Frenzy keep every run feeling fresh."
+          />
+          <FeatureCard
+            icon={"☠️"}
+            title="Environmental Hazards"
+            description="Dodge Void Rifts that pull you in, sidestep corrosive Plasma Pools, and escape Gravity Anomalies that warp your movement."
+          />
+          <FeatureCard
+            icon={"🎁"}
+            title="Boss Loot Drops"
+            description="Defeat bosses to earn powerful loot — Health Packs, Smart Bombs, Magnet Pulses, and Shields that turn the tide of battle."
           />
           <FeatureCard
             icon={"🎭"}
@@ -790,7 +800,39 @@ export default function HomePage() {
                 textTransform: "uppercase",
               }}
             >
-              v1.2 &mdash; Latest
+              v1.3 &mdash; Latest
+            </div>
+            <p
+              style={{
+                fontSize: "0.95rem",
+                color: "rgba(224,224,240,0.65)",
+                lineHeight: 1.6,
+                margin: 0,
+              }}
+            >
+              Boss Variety, Loot Drops &amp; Hazards. Three boss variants (Titan, Harbinger, Nexus), boss loot drops including Smart Bombs and Shields, and environmental hazards like Void Rifts and Gravity Anomalies.
+            </p>
+          </div>
+
+          <div
+            className="glass"
+            style={{
+              padding: "20px 24px",
+              borderRadius: 12,
+              borderLeft: "3px solid #00f0ff",
+            }}
+          >
+            <div
+              style={{
+                fontSize: "0.75rem",
+                letterSpacing: "0.12em",
+                color: "#00f0ff",
+                fontWeight: 700,
+                marginBottom: 6,
+                textTransform: "uppercase",
+              }}
+            >
+              v1.2
             </div>
             <p
               style={{

@@ -12,6 +12,11 @@ export interface LifetimeStats {
   highestCombo: number;
   highestScore: number;
   bossesKilled: number;
+  titanKills: number;
+  harbingerKills: number;
+  nexusKills: number;
+  dailyChallengesCompleted: number;
+  phantomKills: number;
 }
 
 const STATS_KEY = 'void-survivors-stats';
@@ -26,6 +31,11 @@ const DEFAULT_STATS: LifetimeStats = {
   highestCombo: 0,
   highestScore: 0,
   bossesKilled: 0,
+  titanKills: 0,
+  harbingerKills: 0,
+  nexusKills: 0,
+  dailyChallengesCompleted: 0,
+  phantomKills: 0,
 };
 
 export function loadLifetimeStats(): LifetimeStats {
@@ -57,6 +67,11 @@ export function updateLifetimeStats(
     level: number;
     maxCombo: number;
     bossesKilled: number;
+    titanKills?: number;
+    harbingerKills?: number;
+    nexusKills?: number;
+    dailyChallengeCompleted?: boolean;
+    phantomKills?: number;
   }
 ): LifetimeStats {
   return {
@@ -69,5 +84,10 @@ export function updateLifetimeStats(
     highestCombo: Math.max(current.highestCombo, gameResult.maxCombo),
     highestScore: Math.max(current.highestScore, gameResult.score),
     bossesKilled: current.bossesKilled + gameResult.bossesKilled,
+    titanKills: current.titanKills + (gameResult.titanKills ?? 0),
+    harbingerKills: current.harbingerKills + (gameResult.harbingerKills ?? 0),
+    nexusKills: current.nexusKills + (gameResult.nexusKills ?? 0),
+    dailyChallengesCompleted: current.dailyChallengesCompleted + (gameResult.dailyChallengeCompleted ? 1 : 0),
+    phantomKills: current.phantomKills + (gameResult.phantomKills ?? 0),
   };
 }

@@ -30,6 +30,10 @@ interface GameOverStats {
   wavesSurvived: number;
   maxCombo: number;
   bossesKilled: number;
+  titanKills: number;
+  harbingerKills: number;
+  nexusKills: number;
+  phantomKills: number;
 }
 
 interface AchievementToast {
@@ -118,6 +122,15 @@ interface EngineCallbacks {
     level: number;
     combo: number;
     timeSurvived: number;
+    activeHazards: number;
+    activeAbilities: number;
+    bossesKilledThisRun: number;
+    hasEvolution: boolean;
+    hasGravityWell: boolean;
+    phantomKills: number;
+    titanKills: number;
+    harbingerKills: number;
+    nexusKills: number;
   }) => void;
 }
 
@@ -394,6 +407,11 @@ export default function PlayPage() {
         level: stats.level,
         maxCombo: stats.maxCombo,
         bossesKilled: stats.bossesKilled,
+        titanKills: stats.titanKills,
+        harbingerKills: stats.harbingerKills,
+        nexusKills: stats.nexusKills,
+        phantomKills: stats.phantomKills,
+        dailyChallengeCompleted: isDailyMode,
       });
       statsMod.saveLifetimeStats(updated);
       setLifetimeStats(updated);
@@ -412,6 +430,13 @@ export default function PlayPage() {
           totalKills: updated.totalKills,
           totalPlaytime: updated.totalPlaytime,
           bossesKilled: updated.bossesKilled,
+          titanKills: updated.titanKills,
+          harbingerKills: updated.harbingerKills,
+          nexusKills: updated.nexusKills,
+          phantomKills: updated.phantomKills,
+          dailyChallengesCompleted: updated.dailyChallengesCompleted,
+          dailyChallengeScore: isDailyMode ? stats.score : 0,
+          bossesKilledThisRun: stats.bossesKilled,
         });
         setAchievementCount({ unlocked: mgr.getUnlockedCount(), total: mgr.getTotalCount() });
 
@@ -473,18 +498,35 @@ export default function PlayPage() {
     level: number;
     combo: number;
     timeSurvived: number;
+    activeHazards: number;
+    activeAbilities: number;
+    bossesKilledThisRun: number;
+    hasEvolution: boolean;
+    hasGravityWell: boolean;
+    phantomKills: number;
+    titanKills: number;
+    harbingerKills: number;
+    nexusKills: number;
   }) => {
     const mgr = achievementManagerRef.current;
     if (!mgr) return;
 
-    const lt = lifetimeStats || { gamesPlayed: 0, totalKills: 0, totalPlaytime: 0, bossesKilled: 0 };
+    const lt = lifetimeStats || {
+      gamesPlayed: 0, totalKills: 0, totalPlaytime: 0, bossesKilled: 0,
+      titanKills: 0, harbingerKills: 0, nexusKills: 0, phantomKills: 0, dailyChallengesCompleted: 0,
+    };
 
     mgr.check({
       ...stats,
       gamesPlayed: lt.gamesPlayed,
       totalKills: lt.totalKills + stats.kills,
       totalPlaytime: lt.totalPlaytime + stats.timeSurvived,
-      bossesKilled: lt.bossesKilled,
+      bossesKilled: lt.bossesKilled + stats.bossesKilledThisRun,
+      titanKills: lt.titanKills + stats.titanKills,
+      harbingerKills: lt.harbingerKills + stats.harbingerKills,
+      nexusKills: lt.nexusKills + stats.nexusKills,
+      phantomKills: lt.phantomKills + stats.phantomKills,
+      dailyChallengesCompleted: lt.dailyChallengesCompleted,
     });
 
     let notification = mgr.popNotification();

@@ -89,6 +89,10 @@ interface EngineCallbacks {
     wavesSurvived: number;
     maxCombo: number;
     bossesKilled: number;
+    titanKills: number;
+    harbingerKills: number;
+    nexusKills: number;
+    phantomKills: number;
   }) => void;
   onAchievementCheck?: (stats: {
     score: number;
@@ -97,6 +101,15 @@ interface EngineCallbacks {
     level: number;
     combo: number;
     timeSurvived: number;
+    activeHazards: number;
+    activeAbilities: number;
+    bossesKilledThisRun: number;
+    hasEvolution: boolean;
+    hasGravityWell: boolean;
+    phantomKills: number;
+    titanKills: number;
+    harbingerKills: number;
+    nexusKills: number;
   }) => void;
 }
 
@@ -119,6 +132,10 @@ export class GameEngine {
 
   private enemiesKilled: number = 0;
   private bossesKilled: number = 0;
+  private titanKills: number = 0;
+  private harbingerKills: number = 0;
+  private nexusKills: number = 0;
+  private phantomKillsThisRun: number = 0;
   private lastHudUpdate: number = 0;
   private lastAchievementCheck: number = 0;
 
@@ -374,6 +391,10 @@ export class GameEngine {
 
     this.enemiesKilled = 0;
     this.bossesKilled = 0;
+    this.titanKills = 0;
+    this.harbingerKills = 0;
+    this.nexusKills = 0;
+    this.phantomKillsThisRun = 0;
     this.lastHudUpdate = 0;
     this.lastAchievementCheck = 0;
     this.comboCount = 0;
@@ -638,6 +659,15 @@ export class GameEngine {
           level: s.player.level,
           combo: this.maxCombo,
           timeSurvived: s.time,
+          activeHazards: this.state.hazards?.filter(h => h.active).length || 0,
+          activeAbilities: this.state.player.abilities?.length || 0,
+          bossesKilledThisRun: this.bossesKilled,
+          hasEvolution: this.state.player.abilities?.some(a => a.evolved) || false,
+          hasGravityWell: this.state.player.abilities?.some(a => a.id === 'gravity_well') || false,
+          phantomKills: this.phantomKillsThisRun,
+          titanKills: this.titanKills,
+          harbingerKills: this.harbingerKills,
+          nexusKills: this.nexusKills,
         });
       }
     }
@@ -1021,8 +1051,15 @@ export class GameEngine {
     this.particles.emitExplosion(enemy.pos.x, enemy.pos.y, enemy.color, 15);
     this.audio.playExplosion();
 
+    if (enemy.enemyType === 'phantom') {
+      this.phantomKillsThisRun++;
+    }
+
     if (enemy.enemyType === 'boss') {
       this.bossesKilled++;
+      if (enemy.bossVariant === 'titan') this.titanKills++;
+      else if (enemy.bossVariant === 'harbinger') this.harbingerKills++;
+      else if (enemy.bossVariant === 'nexus') this.nexusKills++;
       this.particles.emitExplosion(
         enemy.pos.x,
         enemy.pos.y,
@@ -1443,6 +1480,10 @@ export class GameEngine {
         wavesSurvived: this.state.wave,
         maxCombo: this.maxCombo,
         bossesKilled: this.bossesKilled,
+        titanKills: this.titanKills,
+        harbingerKills: this.harbingerKills,
+        nexusKills: this.nexusKills,
+        phantomKills: this.phantomKillsThisRun,
       });
     }
   }

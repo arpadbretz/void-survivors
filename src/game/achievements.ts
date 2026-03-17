@@ -22,6 +22,18 @@ export interface AchievementStats {
   totalKills: number;
   totalPlaytime: number;
   bossesKilled: number;
+  // New stat fields for boss variants, hazards, abilities, etc.
+  titanKills?: number;
+  harbingerKills?: number;
+  nexusKills?: number;
+  bossesKilledThisRun?: number;
+  activeHazards?: number;
+  phantomKills?: number;
+  hasGravityWell?: boolean;
+  hasEvolution?: boolean;
+  activeAbilities?: number;
+  dailyChallengesCompleted?: number;
+  dailyChallengeScore?: number;
 }
 
 export interface UnlockedAchievement {
@@ -68,6 +80,31 @@ const ACHIEVEMENTS: Achievement[] = [
   { id: 'total_kills_500', name: 'Serial Killer', description: 'Kill 500 enemies total', icon: '\u{2694}\u{FE0F}', tier: 'silver', condition: (s) => s.totalKills >= 500 },
   { id: 'total_kills_2000', name: 'Death Machine', description: 'Kill 2,000 enemies total', icon: '\u{1F52B}', tier: 'gold', condition: (s) => s.totalKills >= 2000 },
   { id: 'boss_slayer', name: 'Boss Slayer', description: 'Kill a boss', icon: '\u{1F479}', tier: 'silver', condition: (s) => s.bossesKilled >= 1 },
+
+  // Boss variant achievements
+  { id: 'titan_slayer', name: 'Titan Slayer', description: 'Defeat a Titan boss', icon: '\u{1F9BE}', tier: 'silver', condition: (s) => (s.titanKills ?? 0) >= 1 },
+  { id: 'harbinger_end', name: "Harbinger's End", description: 'Defeat a Harbinger boss', icon: '\u{1F30C}', tier: 'silver', condition: (s) => (s.harbingerKills ?? 0) >= 1 },
+  { id: 'nexus_destroyer', name: 'Nexus Destroyer', description: 'Defeat a Nexus boss', icon: '\u{1F4A0}', tier: 'gold', condition: (s) => (s.nexusKills ?? 0) >= 1 },
+  { id: 'boss_rush', name: 'Boss Rush', description: 'Defeat 3 bosses in a single run', icon: '\u{1F3C3}', tier: 'gold', condition: (s) => (s.bossesKilledThisRun ?? 0) >= 3 },
+
+  // Hazard achievements
+  { id: 'danger_zone', name: 'Danger Zone', description: 'Survive while 3+ hazards are active', icon: '\u{26A0}\u{FE0F}', tier: 'bronze', condition: (s) => (s.activeHazards ?? 0) >= 3 },
+  { id: 'untouchable', name: 'Untouchable', description: 'Reach wave 5 without dying', icon: '\u{1F6E1}\u{FE0F}', tier: 'silver', condition: (s) => s.wave >= 5 },
+
+  // Combat achievements
+  { id: 'phantom_hunter', name: 'Phantom Hunter', description: 'Kill 20 phantoms total', icon: '\u{1F47B}', tier: 'silver', condition: (s) => (s.phantomKills ?? 0) >= 20 },
+  { id: 'gravity_master', name: 'Gravity Master', description: 'Have Gravity Well ability', icon: '\u{1F300}', tier: 'silver', condition: (s) => s.hasGravityWell === true },
+  { id: 'evolution_complete', name: 'Evolution Complete', description: 'Evolve a weapon', icon: '\u{1F9EC}', tier: 'gold', condition: (s) => s.hasEvolution === true },
+  { id: 'full_arsenal', name: 'Full Arsenal', description: 'Have 5+ abilities simultaneously', icon: '\u{1F52E}', tier: 'gold', condition: (s) => (s.activeAbilities ?? 0) >= 5 },
+
+  // Daily challenge achievements
+  { id: 'daily_player', name: 'Daily Player', description: 'Complete a daily challenge', icon: '\u{1F4C5}', tier: 'bronze', condition: (s) => (s.dailyChallengesCompleted ?? 0) >= 1 },
+  { id: 'daily_dedicated', name: 'Dedicated', description: 'Complete 10 daily challenges', icon: '\u{1F4C6}', tier: 'silver', condition: (s) => (s.dailyChallengesCompleted ?? 0) >= 10 },
+  { id: 'score_chaser', name: 'Score Chaser', description: 'Score over 10,000 in a daily challenge', icon: '\u{1F3AF}', tier: 'gold', condition: (s) => (s.dailyChallengeScore ?? 0) >= 10000 },
+
+  // Mastery achievements
+  { id: 'veteran', name: 'Veteran', description: 'Play 50 total games', icon: '\u{1F396}\u{FE0F}', tier: 'silver', condition: (s) => s.gamesPlayed >= 50 },
+  { id: 'void_master', name: 'Void Master', description: 'Reach wave 20', icon: '\u{1F3C5}', tier: 'platinum', condition: (s) => s.wave >= 20 },
 ];
 
 const STORAGE_KEY = 'void-survivors-achievements';
