@@ -39,6 +39,7 @@ import {
 import { AudioManager } from './audio';
 import { loadMeta, getMetaBonuses, MetaBonuses } from './meta';
 import { getCharacter, CharacterDef } from './characters';
+import { DailyModifier, getModifierValue } from './daily';
 
 // ── Constants ───────────────────────────────────────────────────
 
@@ -138,6 +139,9 @@ export class GameEngine {
   // Character selection
   private characterId: string = 'void_walker';
   private characterDef: CharacterDef = getCharacter('void_walker');
+
+  // Daily challenge modifiers
+  private dailyModifiers: DailyModifier[] = [];
 
   // Meta-progression bonuses applied at game start
   private metaBonuses: MetaBonuses = {
@@ -248,6 +252,10 @@ export class GameEngine {
     this.characterDef = getCharacter(characterId);
   }
 
+  setDailyModifiers(modifiers: DailyModifier[]): void {
+    this.dailyModifiers = modifiers;
+  }
+
   setSoundEnabled(enabled: boolean): void {
     this.soundEnabled = enabled;
     if (enabled) this.audio.unmute();
@@ -335,6 +343,15 @@ export class GameEngine {
     this.state.player.maxHealth += bonuses.maxHealthBonus;
     this.state.player.health = this.state.player.maxHealth;
     this.state.player.speed *= bonuses.speedMultiplier;
+
+    // Apply daily challenge modifiers to player stats
+    if (this.dailyModifiers.length > 0) {
+      const healthMult = getModifierValue(this.dailyModifiers, 'health_mult');
+      const speedMult = getModifierValue(this.dailyModifiers, 'speed_mult');
+      this.state.player.maxHealth = Math.floor(this.state.player.maxHealth * healthMult);
+      this.state.player.health = this.state.player.maxHealth;
+      this.state.player.speed *= speedMult;
+    }
 
     this.enemiesKilled = 0;
     this.bossesKilled = 0;
@@ -439,15 +456,23 @@ export class GameEngine {
     // 2. Abilities
     this.updateAbilities(dt);
 
-    // 3. Enemy spawning
+    // 3. Enemy spawning (daily spawn_rate_mult speeds up the timer)
+    const dailySpawnMult = getModifierValue(this.dailyModifiers, 'spawn_rate_mult');
     const newEnemies = this.enemyManager.updateSpawning(
-      dt,
+      dt * dailySpawnMult,
       s.wave,
       s.player.pos,
       WORLD_SIZE,
       s.enemies
     );
-    for (const e of newEnemies) e.spawnTime = s.time;
+    const dailyEnemyHealthMult = getModifierValue(this.dailyModifiers, 'enemy_health_mult');
+    for (const e of newEnemies) {
+      e.spawnTime = s.time;
+      if (dailyEnemyHealthMult !== 1) {
+        e.maxHealth = Math.floor(e.maxHealth * dailyEnemyHealthMult);
+        e.health = e.maxHealth;
+      }
+    }
     s.enemies.push(...newEnemies);
 
     // Check for boss spawn on milestone waves
@@ -462,7 +487,13 @@ export class GameEngine {
         s.enemies
       );
       if (bossEnemies.length > 0) {
-        for (const e of bossEnemies) e.spawnTime = s.time;
+        for (const e of bossEnemies) {
+          e.spawnTime = s.time;
+          if (dailyEnemyHealthMult !== 1) {
+            e.maxHealth = Math.floor(e.maxHealth * dailyEnemyHealthMult);
+            e.health = e.maxHealth;
+          }
+        }
         s.enemies.push(...bossEnemies);
         this.audio.playBossSpawn();
       }
@@ -665,7 +696,8 @@ export class GameEngine {
 
       if (dist < p.radius + orb.radius) {
         orb.active = false;
-        const xpGain = Math.floor(orb.value * this.metaBonuses.xpMultiplier * this.characterDef.xpMultiplier);
+        const dailyXpMult = getModifierValue(this.dailyModifiers, 'xp_mult');
+        const xpGain = Math.floor(orb.value * this.metaBonuses.xpMultiplier * this.characterDef.xpMultiplier * dailyXpMult);
         p.xp += xpGain;
         this.state.score += orb.value;
         this.particles.emitXPPickup(orb.pos.x, orb.pos.y);
@@ -688,7 +720,8 @@ export class GameEngine {
 
         const dist = distance(proj.pos, enemy.pos);
         if (dist < proj.radius + enemy.radius) {
-          const actualDamage = Math.floor(proj.damage * this.metaBonuses.damageMultiplier * this.characterDef.damageMultiplier);
+          const dailyDamageMult = getModifierValue(this.dailyModifiers, 'damage_mult');
+          const actualDamage = Math.floor(proj.damage * this.metaBonuses.damageMultiplier * this.characterDef.damageMultiplier * dailyDamageMult);
           enemy.health -= actualDamage;
           this.particles.emitDamageNumber(
             enemy.pos.x,

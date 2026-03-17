@@ -14,12 +14,59 @@ import {
   GameState,
 } from './types';
 
-const BG_COLOR = '#0a0a12';
-const GRID_COLOR = 'rgba(30, 40, 80, 0.3)';
 const GRID_SPACING = 80;
 
 // Margin beyond viewport edges to keep drawing (avoids popping)
 const CULL_MARGIN = 80;
+
+// Wave-based background colors { r, g, b }
+const WAVE_BG_COLORS: { min: number; max: number; r: number; g: number; b: number }[] = [
+  { min: 1, max: 2, r: 10, g: 10, b: 18 },   // Deep blue
+  { min: 3, max: 5, r: 12, g: 10, b: 20 },   // Dark purple
+  { min: 6, max: 8, r: 18, g: 10, b: 10 },   // Deep red
+  { min: 9, max: 999, r: 10, g: 18, b: 10 },  // Dark green
+];
+
+// Wave-based grid tint colors (brighter versions of wave bg)
+const WAVE_GRID_TINTS: { min: number; max: number; r: number; g: number; b: number }[] = [
+  { min: 1, max: 2, r: 30, g: 40, b: 80 },
+  { min: 3, max: 5, r: 50, g: 30, b: 80 },
+  { min: 6, max: 8, r: 80, g: 30, b: 30 },
+  { min: 9, max: 999, r: 30, g: 80, b: 30 },
+];
+
+// Wave-based edge glow colors
+const WAVE_EDGE_COLORS: { min: number; max: number; r: number; g: number; b: number }[] = [
+  { min: 1, max: 2, r: 50, g: 80, b: 255 },
+  { min: 3, max: 5, r: 150, g: 50, b: 255 },
+  { min: 6, max: 8, r: 255, g: 50, b: 50 },
+  { min: 9, max: 999, r: 50, g: 255, b: 80 },
+];
+
+interface BackgroundStar {
+  x: number;
+  y: number;
+  size: number;
+  baseAlpha: number;
+  speed: number;
+  dirX: number;
+  dirY: number;
+  twinklePhase: number;
+  twinkleSpeed: number;
+}
+
+function getWaveColor(wave: number, table: { min: number; max: number; r: number; g: number; b: number }[]): { r: number; g: number; b: number } {
+  for (const entry of table) {
+    if (wave >= entry.min && wave <= entry.max) {
+      return { r: entry.r, g: entry.g, b: entry.b };
+    }
+  }
+  return table[table.length - 1];
+}
+
+function lerpValue(a: number, b: number, t: number): number {
+  return a + (b - a) * t;
+}
 
 export class Renderer {
   private canvas: HTMLCanvasElement;
@@ -41,11 +88,67 @@ export class Renderer {
   // Kill counter flash state
   private killFlashEntries: { count: number; time: number }[] = [];
 
+  // Dynamic background color (lerped per wave)
+  private currentBgR: number = 10;
+  private currentBgG: number = 10;
+  private currentBgB: number = 18;
+  private targetBgR: number = 10;
+  private targetBgG: number = 10;
+  private targetBgB: number = 18;
+  private currentGridR: number = 30;
+  private currentGridG: number = 40;
+  private currentGridB: number = 80;
+  private targetGridR: number = 30;
+  private targetGridG: number = 40;
+  private targetGridB: number = 80;
+  private currentEdgeR: number = 50;
+  private currentEdgeG: number = 80;
+  private currentEdgeB: number = 255;
+  private targetEdgeR: number = 50;
+  private targetEdgeG: number = 80;
+  private targetEdgeB: number = 255;
+  private lastWave: number = 0;
+  private bgTransitionStart: number = 0;
+  private bgTransitionDuration: number = 2; // seconds
+
+  // Background stars
+  private stars: BackgroundStar[] = [];
+  private starsWorldSize: number = 4000;
+
+  // World edge pulse phase
+  private edgePulsePhase: number = 0;
+
+  // Star update timing
+  private _lastStarUpdate: number = 0;
+
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d')!;
     this.width = canvas.width;
     this.height = canvas.height;
+
+    // Initialize background stars
+    this.initStars(4000);
+  }
+
+  private initStars(worldSize: number): void {
+    this.starsWorldSize = worldSize;
+    this.stars = [];
+    for (let i = 0; i < 60; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 5 + Math.random() * 10;
+      this.stars.push({
+        x: Math.random() * worldSize,
+        y: Math.random() * worldSize,
+        size: 1 + Math.random() * 2,
+        baseAlpha: 0.1 + Math.random() * 0.2,
+        speed,
+        dirX: Math.cos(angle),
+        dirY: Math.sin(angle),
+        twinklePhase: Math.random() * Math.PI * 2,
+        twinkleSpeed: 1.5 + Math.random() * 2,
+      });
+    }
   }
 
   resize(width: number, height: number): void {
@@ -55,9 +158,64 @@ export class Renderer {
     this.height = height;
   }
 
+  /**
+   * Update wave-dependent colors internally. Called from drawHUD each frame.
+   */
+  private updateWaveColors(wave: number, gameTime: number): void {
+    if (wave !== this.lastWave && wave > 0) {
+      this.lastWave = wave;
+      const bgTarget = getWaveColor(wave, WAVE_BG_COLORS);
+      this.targetBgR = bgTarget.r;
+      this.targetBgG = bgTarget.g;
+      this.targetBgB = bgTarget.b;
+      const gridTarget = getWaveColor(wave, WAVE_GRID_TINTS);
+      this.targetGridR = gridTarget.r;
+      this.targetGridG = gridTarget.g;
+      this.targetGridB = gridTarget.b;
+      const edgeTarget = getWaveColor(wave, WAVE_EDGE_COLORS);
+      this.targetEdgeR = edgeTarget.r;
+      this.targetEdgeG = edgeTarget.g;
+      this.targetEdgeB = edgeTarget.b;
+      this.bgTransitionStart = gameTime;
+    }
+
+    // Lerp colors toward target
+    const elapsed = gameTime - this.bgTransitionStart;
+    const t = Math.min(1, elapsed / this.bgTransitionDuration);
+    const lerpSpeed = t < 1 ? 0.02 : 0;
+    this.currentBgR = lerpValue(this.currentBgR, this.targetBgR, lerpSpeed);
+    this.currentBgG = lerpValue(this.currentBgG, this.targetBgG, lerpSpeed);
+    this.currentBgB = lerpValue(this.currentBgB, this.targetBgB, lerpSpeed);
+    this.currentGridR = lerpValue(this.currentGridR, this.targetGridR, lerpSpeed);
+    this.currentGridG = lerpValue(this.currentGridG, this.targetGridG, lerpSpeed);
+    this.currentGridB = lerpValue(this.currentGridB, this.targetGridB, lerpSpeed);
+    this.currentEdgeR = lerpValue(this.currentEdgeR, this.targetEdgeR, lerpSpeed);
+    this.currentEdgeG = lerpValue(this.currentEdgeG, this.targetEdgeG, lerpSpeed);
+    this.currentEdgeB = lerpValue(this.currentEdgeB, this.targetEdgeB, lerpSpeed);
+
+    // Snap when close enough
+    if (t >= 1) {
+      this.currentBgR = this.targetBgR;
+      this.currentBgG = this.targetBgG;
+      this.currentBgB = this.targetBgB;
+      this.currentGridR = this.targetGridR;
+      this.currentGridG = this.targetGridG;
+      this.currentGridB = this.targetGridB;
+      this.currentEdgeR = this.targetEdgeR;
+      this.currentEdgeG = this.targetEdgeG;
+      this.currentEdgeB = this.targetEdgeB;
+    }
+
+    // Update edge pulse
+    this.edgePulsePhase = gameTime;
+  }
+
   clear(): void {
     this.ctx.globalCompositeOperation = 'source-over';
-    this.ctx.fillStyle = BG_COLOR;
+    const r = Math.round(this.currentBgR);
+    const g = Math.round(this.currentBgG);
+    const b = Math.round(this.currentBgB);
+    this.ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
     this.ctx.fillRect(0, 0, this.width, this.height);
   }
 
@@ -92,6 +250,10 @@ export class Renderer {
 
   drawGrid(camera: Camera): void {
     const ctx = this.ctx;
+    const now = performance.now() / 1000;
+    const dt = now - (this._lastStarUpdate || now);
+    this._lastStarUpdate = now;
+
     const startX =
       Math.floor((camera.x - this.width / 2) / GRID_SPACING) * GRID_SPACING;
     const startY =
@@ -99,34 +261,113 @@ export class Renderer {
     const endX = camera.x + this.width / 2 + GRID_SPACING;
     const endY = camera.y + this.height / 2 + GRID_SPACING;
 
-    ctx.strokeStyle = GRID_COLOR;
+    const gr = Math.round(this.currentGridR);
+    const gg = Math.round(this.currentGridG);
+    const gb = Math.round(this.currentGridB);
+
+    // Camera follows player, so use camera position as proxy
+    const px = camera.x;
+    const py = camera.y;
+    const brightRadius = 300;
+    const brightRadiusSq = brightRadius * brightRadius;
+
+    // Draw dim grid lines (further from player)
+    ctx.strokeStyle = `rgba(${gr}, ${gg}, ${gb}, 0.15)`;
     ctx.lineWidth = 1;
     ctx.beginPath();
-
     for (let x = startX; x <= endX; x += GRID_SPACING) {
+      const dx = x - px;
+      if (dx * dx < brightRadiusSq) continue;
       ctx.moveTo(x, startY);
       ctx.lineTo(x, endY);
     }
     for (let y = startY; y <= endY; y += GRID_SPACING) {
+      const dy = y - py;
+      if (dy * dy < brightRadiusSq) continue;
       ctx.moveTo(startX, y);
       ctx.lineTo(endX, y);
     }
-
     ctx.stroke();
+
+    // Draw bright grid lines (near player — "sonar" effect)
+    ctx.strokeStyle = `rgba(${gr}, ${gg}, ${gb}, 0.35)`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let x = startX; x <= endX; x += GRID_SPACING) {
+      const dx = x - px;
+      if (dx * dx >= brightRadiusSq) continue;
+      ctx.moveTo(x, startY);
+      ctx.lineTo(x, endY);
+    }
+    for (let y = startY; y <= endY; y += GRID_SPACING) {
+      const dy = y - py;
+      if (dy * dy >= brightRadiusSq) continue;
+      ctx.moveTo(startX, y);
+      ctx.lineTo(endX, y);
+    }
+    ctx.stroke();
+
+    // Update and draw background stars (after grid, before entities)
+    if (dt > 0 && dt < 0.5) {
+      const ws = this.starsWorldSize;
+      for (const star of this.stars) {
+        star.x += star.dirX * star.speed * dt;
+        star.y += star.dirY * star.speed * dt;
+        if (star.x < 0) star.x += ws;
+        else if (star.x > ws) star.x -= ws;
+        if (star.y < 0) star.y += ws;
+        else if (star.y > ws) star.y -= ws;
+      }
+    }
+
+    const halfW = this.width / 2 + CULL_MARGIN;
+    const halfH = this.height / 2 + CULL_MARGIN;
+    const gameTime = now;
+
+    for (const star of this.stars) {
+      const dx = star.x - camera.x;
+      const dy = star.y - camera.y;
+      if (dx < -halfW || dx > halfW || dy < -halfH || dy > halfH) continue;
+
+      const twinkle = Math.sin(gameTime * star.twinkleSpeed + star.twinklePhase);
+      const alpha = star.baseAlpha + twinkle * 0.1;
+      if (alpha <= 0.02) continue;
+
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(
+        star.x - star.size * 0.5,
+        star.y - star.size * 0.5,
+        star.size,
+        star.size
+      );
+    }
+    ctx.globalAlpha = 1;
   }
 
   // ── World Boundary ────────────────────────────────────────────
 
   drawWorldBounds(worldSize: number): void {
     const ctx = this.ctx;
+    const er = Math.round(this.currentEdgeR);
+    const eg = Math.round(this.currentEdgeG);
+    const eb = Math.round(this.currentEdgeB);
 
-    // Outer glow line (wider, semi-transparent)
-    ctx.strokeStyle = 'rgba(255, 0, 68, 0.25)';
+    // Gentle pulse
+    const pulse = 0.5 + Math.sin(this.edgePulsePhase * 1.5) * 0.3;
+
+    // Outer glow fade (20px wide, semi-transparent)
+    ctx.strokeStyle = `rgba(${er}, ${eg}, ${eb}, ${0.08 * pulse})`;
+    ctx.lineWidth = 20;
+    ctx.strokeRect(0, 0, worldSize, worldSize);
+
+    // Mid glow
+    ctx.strokeStyle = `rgba(${er}, ${eg}, ${eb}, ${0.15 * pulse})`;
     ctx.lineWidth = 10;
     ctx.strokeRect(0, 0, worldSize, worldSize);
 
-    // Inner sharp line
-    ctx.strokeStyle = '#ff004488';
+    // Inner sharp line (3px)
+    ctx.strokeStyle = `rgba(${er}, ${eg}, ${eb}, ${0.5 * pulse})`;
     ctx.lineWidth = 3;
     ctx.strokeRect(0, 0, worldSize, worldSize);
   }
@@ -522,6 +763,12 @@ export class Renderer {
   }
 
   drawHUD(state: GameState, worldSize: number = 4000): void {
+    // Update wave-dependent colors each frame (uses state.wave and state.time)
+    this.updateWaveColors(state.wave, state.time);
+    if (this.starsWorldSize !== worldSize) {
+      this.initStars(worldSize);
+    }
+
     const ctx = this.ctx;
     const player = state.player;
 

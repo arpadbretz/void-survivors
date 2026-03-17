@@ -40,7 +40,7 @@ interface AchievementToast {
   expiresAt: number;
 }
 
-type GameScreen = "menu" | "playing" | "paused" | "upgrade" | "gameover" | "achievements" | "stats" | "shop" | "characters";
+type GameScreen = "menu" | "playing" | "paused" | "upgrade" | "gameover" | "achievements" | "stats" | "shop" | "characters" | "daily";
 
 interface HighScoreEntry {
   score: number;
@@ -101,6 +101,7 @@ interface GameEngineInterface {
   restart: () => void;
   setSoundEnabled: (enabled: boolean) => void;
   setCharacter: (characterId: string) => void;
+  setDailyModifiers: (modifiers: import("@/game/daily").DailyModifier[]) => void;
   startAttractMode: (canvas: HTMLCanvasElement) => void;
   stopAttractMode: () => void;
 }
@@ -178,6 +179,11 @@ export default function PlayPage() {
   const [selectedCharacter, setSelectedCharacter] = useState<string>("void_walker");
   const [characterDefs, setCharacterDefs] = useState<import("@/game/characters").CharacterDef[]>([]);
 
+  // Daily challenge state
+  const [dailyChallenge, setDailyChallenge] = useState<import("@/game/daily").DailyChallenge | null>(null);
+  const [dailyResult, setDailyResult] = useState<import("@/game/daily").DailyResult | null>(null);
+  const [isDailyMode, setIsDailyMode] = useState(false);
+
   // Joystick state
   const joystickRef = useRef<HTMLDivElement>(null);
   const [joystickActive, setJoystickActive] = useState(false);
@@ -202,6 +208,12 @@ export default function PlayPage() {
       const savedChar = localStorage.getItem("void-survivors-character");
       if (savedChar) setSelectedCharacter(savedChar);
     } catch { /* ignore */ }
+
+    // Load daily challenge
+    import("@/game/daily").then((dailyMod) => {
+      setDailyChallenge(dailyMod.getTodaysChallenge());
+      setDailyResult(dailyMod.loadDailyResult());
+    });
 
     // Load achievement manager, lifetime stats, and meta-progression
     Promise.all([
@@ -269,6 +281,26 @@ export default function PlayPage() {
 
   const handleGameOver = useCallback(async (stats: GameOverStats) => {
     setGameOverStats(stats);
+
+    // Save daily challenge result if in daily mode
+    if (isDailyMode && dailyChallenge) {
+      try {
+        const dailyMod = await import("@/game/daily");
+        const result: import("@/game/daily").DailyResult = {
+          date: dailyChallenge.date,
+          score: stats.score,
+          wave: stats.wavesSurvived,
+          time: stats.timeSurvived,
+          completed: true,
+        };
+        dailyMod.saveDailyResult(result);
+        setDailyResult(dailyMod.loadDailyResult());
+      } catch {
+        // ignore
+      }
+      setIsDailyMode(false);
+    }
+
     const entry: HighScoreEntry = {
       score: stats.score,
       level: stats.level,
@@ -362,7 +394,7 @@ export default function PlayPage() {
     }
 
     setScreen("gameover");
-  }, []);
+  }, [isDailyMode, dailyChallenge]);
 
   // -----------------------------------------------------------------------
   // Real-time achievement check (during gameplay)
@@ -443,6 +475,8 @@ export default function PlayPage() {
     if (!canvasRef.current || !engineRef.current) return;
     engineRef.current.stopAttractMode();
     engineRef.current.setCharacter(selectedCharacter);
+    engineRef.current.setDailyModifiers([]);
+    setIsDailyMode(false);
     engineRef.current.start(canvasRef.current, {
       onStateChange: handleStateChange,
       onLevelUp: handleLevelUp,
@@ -452,6 +486,25 @@ export default function PlayPage() {
     engineRef.current.setSoundEnabled(soundEnabled);
     setScreen("playing");
   }, [handleStateChange, handleLevelUp, handleGameOver, handleAchievementCheck, soundEnabled, selectedCharacter]);
+
+  // -----------------------------------------------------------------------
+  // Start daily challenge
+  // -----------------------------------------------------------------------
+  const startDailyChallenge = useCallback(() => {
+    if (!canvasRef.current || !engineRef.current || !dailyChallenge) return;
+    engineRef.current.stopAttractMode();
+    engineRef.current.setCharacter(selectedCharacter);
+    engineRef.current.setDailyModifiers(dailyChallenge.modifiers);
+    engineRef.current.start(canvasRef.current, {
+      onStateChange: handleStateChange,
+      onLevelUp: handleLevelUp,
+      onGameOver: handleGameOver,
+      onAchievementCheck: handleAchievementCheck,
+    });
+    engineRef.current.setSoundEnabled(soundEnabled);
+    setIsDailyMode(true);
+    setScreen("playing");
+  }, [handleStateChange, handleLevelUp, handleGameOver, handleAchievementCheck, soundEnabled, selectedCharacter, dailyChallenge]);
 
   // -----------------------------------------------------------------------
   // Select upgrade
@@ -471,6 +524,8 @@ export default function PlayPage() {
   const restartGame = useCallback(() => {
     engineRef.current?.restart();
     engineRef.current?.setCharacter(selectedCharacter);
+    engineRef.current?.setDailyModifiers([]);
+    setIsDailyMode(false);
     engineRef.current?.start(canvasRef.current!, {
       onStateChange: handleStateChange,
       onLevelUp: handleLevelUp,
@@ -673,6 +728,52 @@ export default function PlayPage() {
             >
               PLAY
             </button>
+
+            {/* Daily Challenge Button */}
+            {dailyChallenge && (
+              <button
+                onClick={() => setScreen("daily")}
+                style={{
+                  marginTop: 16,
+                  background: "linear-gradient(135deg, rgba(255,170,0,0.15), rgba(255,136,0,0.08))",
+                  border: "1px solid rgba(255,170,0,0.4)",
+                  borderRadius: 10,
+                  color: "#ffaa00",
+                  padding: "12px 32px",
+                  cursor: "pointer",
+                  fontSize: "1rem",
+                  fontFamily: "var(--font-geist-mono), monospace",
+                  letterSpacing: "0.08em",
+                  transition: "all 0.2s",
+                  textShadow: "0 0 8px rgba(255,170,0,0.4)",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 4,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = "#ffaa00";
+                  e.currentTarget.style.boxShadow = "0 0 16px rgba(255,170,0,0.3)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = "rgba(255,170,0,0.4)";
+                  e.currentTarget.style.boxShadow = "none";
+                }}
+              >
+                <span>Daily Challenge: {dailyChallenge.title}</span>
+                {dailyResult && (
+                  <span
+                    style={{
+                      fontSize: "0.75rem",
+                      color: "#ffd700",
+                      letterSpacing: "0.05em",
+                    }}
+                  >
+                    Today&apos;s Best: {dailyResult.score.toLocaleString()}
+                  </span>
+                )}
+              </button>
+            )}
 
             <p
               style={{
@@ -2279,6 +2380,206 @@ export default function PlayPage() {
             >
               Press ESC to resume
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* ============== Daily Challenge Screen ============== */}
+      {screen === "daily" && dailyChallenge && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 20,
+            background: "rgba(10, 10, 18, 0.92)",
+          }}
+        >
+          <div style={{ textAlign: "center", maxWidth: 500, padding: "0 20px" }}>
+            <h2
+              style={{
+                fontSize: "clamp(1.6rem, 4vw, 2.5rem)",
+                fontWeight: 800,
+                color: "#ffaa00",
+                textShadow: "0 0 20px rgba(255,170,0,0.5)",
+                marginBottom: 8,
+                letterSpacing: "0.1em",
+              }}
+            >
+              DAILY CHALLENGE
+            </h2>
+            <p
+              style={{
+                color: "rgba(224,224,240,0.4)",
+                fontSize: "0.85rem",
+                marginBottom: 24,
+                letterSpacing: "0.08em",
+                fontFamily: "var(--font-geist-mono), monospace",
+              }}
+            >
+              {dailyChallenge.date}
+            </p>
+
+            <div
+              style={{
+                background: "linear-gradient(135deg, rgba(255,170,0,0.1), rgba(255,136,0,0.05))",
+                border: "1px solid rgba(255,170,0,0.25)",
+                borderRadius: 12,
+                padding: "24px 28px",
+                marginBottom: 24,
+              }}
+            >
+              <h3
+                style={{
+                  fontSize: "1.5rem",
+                  fontWeight: 700,
+                  color: "#ffcc44",
+                  marginBottom: 6,
+                  textShadow: "0 0 12px rgba(255,204,68,0.3)",
+                }}
+              >
+                {dailyChallenge.title}
+              </h3>
+              <p
+                style={{
+                  color: "rgba(224,224,240,0.5)",
+                  fontSize: "0.9rem",
+                  marginBottom: 20,
+                }}
+              >
+                {dailyChallenge.description}
+              </p>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {dailyChallenge.modifiers.map((mod, i) => {
+                  const isPositive = mod.label.startsWith("+");
+                  return (
+                    <div
+                      key={i}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        padding: "8px 14px",
+                        borderRadius: 8,
+                        background: isPositive
+                          ? "rgba(0,255,136,0.08)"
+                          : "rgba(255,68,68,0.08)",
+                        border: isPositive
+                          ? "1px solid rgba(0,255,136,0.15)"
+                          : "1px solid rgba(255,68,68,0.15)",
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: "0.85rem",
+                          color: "rgba(224,224,240,0.7)",
+                          textTransform: "capitalize",
+                          fontFamily: "var(--font-geist-mono), monospace",
+                        }}
+                      >
+                        {mod.type.replace(/_mult$/, "").replace(/_/g, " ")}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: "0.9rem",
+                          fontWeight: 700,
+                          color: isPositive ? "#00ff88" : "#ff6666",
+                          fontFamily: "var(--font-geist-mono), monospace",
+                        }}
+                      >
+                        {mod.label}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {dailyResult && (
+              <div
+                style={{
+                  marginBottom: 20,
+                  padding: "12px 20px",
+                  borderRadius: 8,
+                  background: "rgba(255,215,0,0.08)",
+                  border: "1px solid rgba(255,215,0,0.2)",
+                }}
+              >
+                <p
+                  style={{
+                    color: "#ffd700",
+                    fontSize: "0.9rem",
+                    fontWeight: 700,
+                    fontFamily: "var(--font-geist-mono), monospace",
+                    letterSpacing: "0.05em",
+                    margin: 0,
+                  }}
+                >
+                  Today&apos;s Best: {dailyResult.score.toLocaleString()} pts
+                </p>
+                <p
+                  style={{
+                    color: "rgba(224,224,240,0.4)",
+                    fontSize: "0.75rem",
+                    margin: "4px 0 0 0",
+                    fontFamily: "var(--font-geist-mono), monospace",
+                  }}
+                >
+                  Wave {dailyResult.wave} | {formatTime(dailyResult.time)}
+                </p>
+              </div>
+            )}
+
+            <button
+              onClick={startDailyChallenge}
+              style={{
+                background: "linear-gradient(135deg, #ffaa00, #ff8800)",
+                border: "none",
+                borderRadius: 10,
+                color: "#0a0a12",
+                padding: "14px 48px",
+                cursor: "pointer",
+                fontSize: "1.2rem",
+                fontWeight: 800,
+                letterSpacing: "0.1em",
+                textTransform: "uppercase",
+                transition: "all 0.2s",
+                boxShadow: "0 0 20px rgba(255,170,0,0.3)",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.boxShadow = "0 0 30px rgba(255,170,0,0.5)";
+                e.currentTarget.style.transform = "scale(1.05)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.boxShadow = "0 0 20px rgba(255,170,0,0.3)";
+                e.currentTarget.style.transform = "scale(1)";
+              }}
+            >
+              {dailyResult ? "Replay Challenge" : "Play Challenge"}
+            </button>
+
+            <button
+              onClick={() => setScreen("menu")}
+              style={{
+                marginTop: 16,
+                background: "none",
+                border: "1px solid rgba(255,255,255,0.15)",
+                borderRadius: 8,
+                color: "rgba(224, 224, 240, 0.5)",
+                padding: "10px 24px",
+                cursor: "pointer",
+                fontSize: "0.9rem",
+                display: "block",
+                marginLeft: "auto",
+                marginRight: "auto",
+              }}
+            >
+              Back to Menu
+            </button>
           </div>
         </div>
       )}
