@@ -36,6 +36,13 @@ interface GameOverStats {
   phantomKills: number;
   difficulty: string;
   scoreMult: number;
+  damageDealt: number;
+  damageTaken: number;
+  xpCollected: number;
+  elitesKilled: number;
+  longestCombo: number;
+  abilitiesUsed: string[];
+  lootCollected: number;
 }
 
 interface AchievementToast {
@@ -3196,7 +3203,43 @@ export default function PlayPage() {
       )}
 
       {/* ============== Game Over Overlay ============== */}
-      {screen === "gameover" && gameOverStats && (
+      {screen === "gameover" && gameOverStats && (() => {
+        const isNewBest = personalBest !== null && gameOverStats.score >= personalBest && newHighScoreRank === 0;
+        const comboMultLabel = gameOverStats.longestCombo >= 100 ? "5x"
+          : gameOverStats.longestCombo >= 50 ? "3x"
+          : gameOverStats.longestCombo >= 25 ? "2x"
+          : gameOverStats.longestCombo >= 10 ? "1.5x"
+          : "1x";
+        const diffColor = gameOverStats.difficulty === "Easy" ? "#00ff88"
+          : gameOverStats.difficulty === "Hard" ? "#ff8800"
+          : gameOverStats.difficulty === "Nightmare" ? "#ff2244"
+          : "#00f0ff";
+        const diffGlow = gameOverStats.difficulty === "Easy" ? "rgba(0,255,136,0.4)"
+          : gameOverStats.difficulty === "Hard" ? "rgba(255,136,0,0.4)"
+          : gameOverStats.difficulty === "Nightmare" ? "rgba(255,34,68,0.4)"
+          : "rgba(0,240,255,0.4)";
+        const mono = "var(--font-geist-mono), monospace";
+        const dimWhite = "rgba(224,224,240,0.55)";
+        const cyan = "#00eeff";
+        const sectionStyle: React.CSSProperties = {
+          border: `1px solid rgba(0,238,255,0.2)`,
+          borderRadius: 12,
+          padding: isMobile ? "14px 16px" : "16px 24px",
+          background: "rgba(0,238,255,0.03)",
+          backdropFilter: "blur(4px)",
+          width: "100%",
+          maxWidth: 380,
+        };
+        const statRow = (label: string, value: string | number, color: string = cyan) => (
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "3px 0" }}>
+            <span style={{ color: dimWhite, fontSize: isMobile ? "0.78rem" : "0.85rem" }}>{label}</span>
+            <span style={{ color, fontFamily: mono, fontSize: isMobile ? "0.82rem" : "0.9rem", fontWeight: 600 }}>
+              {typeof value === "number" ? value.toLocaleString() : value}
+            </span>
+          </div>
+        );
+
+        return (
         <div
           style={{
             position: "absolute",
@@ -3206,224 +3249,245 @@ export default function PlayPage() {
             alignItems: "center",
             justifyContent: isMobile ? "flex-start" : "center",
             zIndex: 30,
-            background: "rgba(10, 10, 18, 0.85)",
-            backdropFilter: "blur(6px)",
+            background: "rgba(10, 10, 18, 0.88)",
+            backdropFilter: "blur(8px)",
             overflowY: "auto",
             WebkitOverflowScrolling: "touch",
+            animation: "fadeIn 0.5s ease-out",
           }}
         >
-          <div className="animate-scale-in" style={{ textAlign: "center", padding: isMobile ? "32px 12px" : undefined }}>
+          <div style={{
+            textAlign: "center",
+            padding: isMobile ? "28px 16px 40px" : "32px 24px 40px",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 16,
+            maxWidth: 420,
+            width: "100%",
+            animation: "scaleIn 0.4s ease-out",
+          }}>
+            {/* Header */}
             <h2
               className="glow-red"
               style={{
-                fontSize: "clamp(2.5rem, 6vw, 4rem)",
+                fontSize: "clamp(2rem, 5vw, 3rem)",
                 fontWeight: 900,
                 color: "#ff2244",
                 letterSpacing: "0.1em",
-                marginBottom: 32,
+                marginBottom: 0,
               }}
             >
               GAME OVER
             </h2>
 
-            {/* Difficulty badge */}
-            {gameOverStats.difficulty && gameOverStats.difficulty !== "Normal" && (
-              <div
-                style={{
-                  marginBottom: 16,
-                  fontSize: "0.85rem",
-                  fontFamily: "var(--font-geist-mono), monospace",
-                  letterSpacing: "0.12em",
-                  fontWeight: 700,
-                  color: gameOverStats.difficulty === "Easy" ? "#00ff88"
-                    : gameOverStats.difficulty === "Hard" ? "#ff8800"
-                    : gameOverStats.difficulty === "Nightmare" ? "#ff2244"
-                    : "#00f0ff",
-                  textShadow: `0 0 10px ${
-                    gameOverStats.difficulty === "Easy" ? "rgba(0,255,136,0.4)"
-                    : gameOverStats.difficulty === "Hard" ? "rgba(255,136,0,0.4)"
-                    : gameOverStats.difficulty === "Nightmare" ? "rgba(255,34,68,0.4)"
-                    : "rgba(0,240,255,0.4)"
-                  }`,
-                }}
-              >
-                {gameOverStats.difficulty.toUpperCase()} MODE
-                {gameOverStats.scoreMult !== 1 && (
-                  <span style={{ marginLeft: 8, fontSize: "0.75rem", opacity: 0.7 }}>
-                    ({gameOverStats.scoreMult}x score)
+            {/* Run summary line */}
+            <div style={{
+              fontSize: isMobile ? "0.82rem" : "0.9rem",
+              color: "rgba(224,224,240,0.6)",
+              fontFamily: mono,
+              letterSpacing: "0.05em",
+              display: "flex",
+              gap: 12,
+              flexWrap: "wrap",
+              justifyContent: "center",
+            }}>
+              <span>Wave <span style={{ color: cyan }}>{gameOverStats.wavesSurvived}</span></span>
+              <span style={{ opacity: 0.4 }}>{"\u2022"}</span>
+              <span><span style={{ color: cyan }}>{formatTime(gameOverStats.timeSurvived)}</span></span>
+              <span style={{ opacity: 0.4 }}>{"\u2022"}</span>
+              <span>Level <span style={{ color: cyan }}>{gameOverStats.level}</span></span>
+            </div>
+
+            {/* Score Section */}
+            <div style={{ ...sectionStyle, borderColor: isNewBest ? "rgba(255,215,0,0.4)" : "rgba(0,238,255,0.2)" }}>
+              <div style={{
+                fontSize: "clamp(1.5rem, 4vw, 2.2rem)",
+                fontWeight: 900,
+                color: isNewBest ? "#ffd700" : cyan,
+                fontFamily: mono,
+                textShadow: isNewBest ? "0 0 20px rgba(255,215,0,0.6)" : `0 0 15px rgba(0,238,255,0.4)`,
+                letterSpacing: "0.04em",
+              }}>
+                {gameOverStats.score.toLocaleString()}
+              </div>
+              <div style={{ display: "flex", justifyContent: "center", gap: 12, marginTop: 4, fontSize: "0.78rem" }}>
+                {gameOverStats.difficulty && gameOverStats.difficulty !== "Normal" && (
+                  <span style={{
+                    color: diffColor,
+                    fontFamily: mono,
+                    fontWeight: 700,
+                    letterSpacing: "0.08em",
+                    textShadow: `0 0 8px ${diffGlow}`,
+                  }}>
+                    {gameOverStats.difficulty.toUpperCase()}
+                    {gameOverStats.scoreMult !== 1 && (
+                      <span style={{ opacity: 0.7, marginLeft: 4 }}>({gameOverStats.scoreMult}x)</span>
+                    )}
                   </span>
                 )}
               </div>
-            )}
-
-            <div
-              className="glass"
-              style={{
-                display: "inline-grid",
-                gridTemplateColumns: "auto auto",
-                gap: isMobile ? "6px 16px" : "8px 24px",
-                padding: isMobile ? "16px 20px" : "24px 36px",
-                borderRadius: 12,
-                textAlign: "left",
-                fontSize: isMobile ? "0.8rem" : "0.95rem",
-              }}
-            >
-              <span style={{ color: "rgba(224,224,240,0.5)" }}>
-                Time Survived
-              </span>
-              <span
-                style={{
-                  color: "#00f0ff",
-                  fontFamily: "var(--font-geist-mono), monospace",
-                }}
-              >
-                {formatTime(gameOverStats.timeSurvived)}
-              </span>
-
-              <span style={{ color: "rgba(224,224,240,0.5)" }}>Score</span>
-              <span
-                style={{
-                  color: "#00f0ff",
-                  fontFamily: "var(--font-geist-mono), monospace",
-                }}
-              >
-                {gameOverStats.score.toLocaleString()}
-              </span>
-
-              <span style={{ color: "rgba(224,224,240,0.5)" }}>
-                Level Reached
-              </span>
-              <span
-                style={{
+              {isNewBest && (
+                <div style={{
+                  marginTop: 8,
+                  fontSize: "0.85rem",
+                  fontWeight: 800,
                   color: "#ffd700",
-                  fontFamily: "var(--font-geist-mono), monospace",
-                }}
-              >
-                {gameOverStats.level}
-              </span>
-
-              <span style={{ color: "rgba(224,224,240,0.5)" }}>
-                Enemies Killed
-              </span>
-              <span
-                style={{
-                  color: "#ff00aa",
-                  fontFamily: "var(--font-geist-mono), monospace",
-                }}
-              >
-                {gameOverStats.enemiesKilled.toLocaleString()}
-              </span>
-
-              <span style={{ color: "rgba(224,224,240,0.5)" }}>
-                Waves Survived
-              </span>
-              <span
-                style={{
-                  color: "#00ff88",
-                  fontFamily: "var(--font-geist-mono), monospace",
-                }}
-              >
-                {gameOverStats.wavesSurvived}
-              </span>
-
-              <span style={{ color: "rgba(224,224,240,0.5)" }}>
-                Best Combo
-              </span>
-              <span
-                style={{
-                  color: "#ffdd00",
-                  fontFamily: "var(--font-geist-mono), monospace",
-                }}
-              >
-                {gameOverStats.maxCombo}x
-              </span>
+                  letterSpacing: "0.15em",
+                  textShadow: "0 0 12px rgba(255,215,0,0.6)",
+                  animation: "pulse 1.5s ease-in-out infinite",
+                }}>
+                  NEW PERSONAL BEST!
+                </div>
+              )}
+              {personalBest !== null && !isNewBest && (
+                <div style={{
+                  marginTop: 6,
+                  fontSize: "0.75rem",
+                  color: "rgba(224,224,240,0.35)",
+                  fontFamily: mono,
+                }}>
+                  Personal Best: {personalBest.toLocaleString()}
+                </div>
+              )}
             </div>
+
+            {/* Combat Stats Section */}
+            <div style={sectionStyle}>
+              <div style={{
+                fontSize: "0.7rem",
+                fontWeight: 700,
+                letterSpacing: "0.18em",
+                color: "rgba(224,224,240,0.4)",
+                marginBottom: 8,
+                textTransform: "uppercase",
+              }}>
+                Combat Stats
+              </div>
+              {statRow("Kills", gameOverStats.enemiesKilled, "#ff00aa")}
+              {gameOverStats.elitesKilled > 0 && statRow("Elites", gameOverStats.elitesKilled, "#ff8800")}
+              {gameOverStats.bossesKilled > 0 && statRow("Bosses", gameOverStats.bossesKilled, "#ffdd00")}
+              {statRow("Damage Dealt", gameOverStats.damageDealt)}
+              {statRow("Damage Taken", gameOverStats.damageTaken, "#ff4466")}
+              {statRow("Best Combo", `${gameOverStats.longestCombo}x (${comboMultLabel})`, "#ffdd00")}
+            </div>
+
+            {/* Progression Section */}
+            <div style={sectionStyle}>
+              <div style={{
+                fontSize: "0.7rem",
+                fontWeight: 700,
+                letterSpacing: "0.18em",
+                color: "rgba(224,224,240,0.4)",
+                marginBottom: 8,
+                textTransform: "uppercase",
+              }}>
+                Progression
+              </div>
+              {statRow("XP Collected", gameOverStats.xpCollected, "#00ff88")}
+              {statRow("Loot Pickups", gameOverStats.lootCollected, "#2288ff")}
+              {gameOverStats.abilitiesUsed.length > 0 && (
+                <div style={{ marginTop: 6 }}>
+                  <div style={{ color: dimWhite, fontSize: isMobile ? "0.78rem" : "0.85rem", marginBottom: 4 }}>Abilities</div>
+                  <div style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 6,
+                  }}>
+                    {gameOverStats.abilitiesUsed.map((name, i) => (
+                      <span key={i} style={{
+                        fontSize: "0.72rem",
+                        padding: "2px 8px",
+                        borderRadius: 6,
+                        border: "1px solid rgba(0,238,255,0.25)",
+                        background: "rgba(0,238,255,0.06)",
+                        color: cyan,
+                        fontFamily: mono,
+                      }}>
+                        {name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Void Essence Earned */}
+            {lastEssenceEarned > 0 && (
+              <div style={{
+                ...sectionStyle,
+                borderColor: "rgba(170,102,255,0.3)",
+                background: "rgba(170,102,255,0.05)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 10,
+                padding: isMobile ? "12px 16px" : "14px 24px",
+              }}>
+                <span style={{ fontSize: "1.2rem" }}>{"\uD83D\uDCB0"}</span>
+                <span style={{
+                  fontSize: "1.1rem",
+                  fontWeight: 800,
+                  color: "#aa66ff",
+                  fontFamily: mono,
+                  letterSpacing: "0.06em",
+                  textShadow: "0 0 12px rgba(170,102,255,0.5)",
+                }}>
+                  +{lastEssenceEarned.toLocaleString()} Void Essence
+                </span>
+              </div>
+            )}
 
             {/* High Scores */}
             {highScores.length > 0 && (
-              <div
-                className="glass"
-                style={{
-                  marginTop: 24,
-                  padding: "16px 28px",
-                  borderRadius: 12,
-                  display: "inline-block",
-                }}
-              >
-                <h3
-                  style={{
-                    color: "#ffd700",
-                    fontSize: "0.85rem",
-                    fontWeight: 700,
-                    letterSpacing: "0.15em",
-                    marginBottom: 12,
-                    textShadow: "0 0 8px rgba(255,215,0,0.4)",
-                  }}
-                >
-                  HIGH SCORES
-                </h3>
+              <div style={{ ...sectionStyle, borderColor: "rgba(255,215,0,0.2)", background: "rgba(255,215,0,0.02)" }}>
+                <div style={{
+                  fontSize: "0.7rem",
+                  fontWeight: 700,
+                  letterSpacing: "0.18em",
+                  color: "rgba(255,215,0,0.6)",
+                  marginBottom: 8,
+                  textTransform: "uppercase",
+                }}>
+                  High Scores
+                </div>
                 <table
                   style={{
                     borderCollapse: "collapse",
                     width: "100%",
-                    fontFamily: "var(--font-geist-mono), monospace",
-                    fontSize: "0.8rem",
+                    fontFamily: mono,
+                    fontSize: "0.78rem",
                   }}
                 >
                   <thead>
-                    <tr
-                      style={{
-                        color: "rgba(224,224,240,0.4)",
-                        fontSize: "0.7rem",
-                        letterSpacing: "0.1em",
-                      }}
-                    >
-                      <th style={{ padding: "2px 8px", textAlign: "left" }}>#</th>
-                      <th style={{ padding: "2px 8px", textAlign: "right" }}>SCORE</th>
-                      <th style={{ padding: "2px 8px", textAlign: "right" }}>LVL</th>
-                      <th style={{ padding: "2px 8px", textAlign: "right" }}>TIME</th>
-                      <th style={{ padding: "2px 8px", textAlign: "left" }}></th>
+                    <tr style={{ color: "rgba(224,224,240,0.35)", fontSize: "0.65rem", letterSpacing: "0.1em" }}>
+                      <th style={{ padding: "2px 6px", textAlign: "left" }}>#</th>
+                      <th style={{ padding: "2px 6px", textAlign: "right" }}>SCORE</th>
+                      <th style={{ padding: "2px 6px", textAlign: "right" }}>LVL</th>
+                      <th style={{ padding: "2px 6px", textAlign: "right" }}>TIME</th>
+                      <th style={{ padding: "2px 6px", textAlign: "left" }}></th>
                     </tr>
                   </thead>
                   <tbody>
                     {highScores.map((entry, i) => {
                       const isNew = i === newHighScoreRank;
                       return (
-                        <tr
-                          key={i}
-                          style={{
-                            color: isNew ? "#ffd700" : "rgba(224,224,240,0.7)",
-                          }}
-                        >
-                          <td style={{ padding: "3px 8px", textAlign: "left" }}>
-                            {i + 1}
-                          </td>
-                          <td
-                            style={{
-                              padding: "3px 8px",
-                              textAlign: "right",
-                              color: isNew ? "#ffd700" : "#00f0ff",
-                            }}
-                          >
+                        <tr key={i} style={{ color: isNew ? "#ffd700" : "rgba(224,224,240,0.6)" }}>
+                          <td style={{ padding: "2px 6px", textAlign: "left" }}>{i + 1}</td>
+                          <td style={{ padding: "2px 6px", textAlign: "right", color: isNew ? "#ffd700" : cyan }}>
                             {entry.score.toLocaleString()}
                           </td>
-                          <td style={{ padding: "3px 8px", textAlign: "right" }}>
-                            {entry.level}
-                          </td>
-                          <td style={{ padding: "3px 8px", textAlign: "right" }}>
-                            {formatTime(entry.time)}
-                          </td>
-                          <td style={{ padding: "3px 8px", textAlign: "left" }}>
+                          <td style={{ padding: "2px 6px", textAlign: "right" }}>{entry.level}</td>
+                          <td style={{ padding: "2px 6px", textAlign: "right" }}>{formatTime(entry.time)}</td>
+                          <td style={{ padding: "2px 6px", textAlign: "left" }}>
                             {isNew && (
-                              <span
-                                style={{
-                                  color: "#ffd700",
-                                  fontSize: "0.65rem",
-                                  fontWeight: 800,
-                                  letterSpacing: "0.05em",
-                                  textShadow: "0 0 6px rgba(255,215,0,0.6)",
-                                }}
-                              >
+                              <span style={{
+                                color: "#ffd700",
+                                fontSize: "0.6rem",
+                                fontWeight: 800,
+                                letterSpacing: "0.05em",
+                                textShadow: "0 0 6px rgba(255,215,0,0.6)",
+                              }}>
                                 NEW!
                               </span>
                             )}
@@ -3436,43 +3500,26 @@ export default function PlayPage() {
               </div>
             )}
 
-            {/* Void Essence Earned */}
-            {lastEssenceEarned > 0 && (
-              <div
-                style={{
-                  marginTop: 20,
-                  fontSize: "1rem",
-                  color: "#aa66ff",
-                  fontFamily: "var(--font-geist-mono), monospace",
-                  letterSpacing: "0.08em",
-                  textShadow: "0 0 12px rgba(170,102,255,0.5)",
-                }}
-              >
-                +{lastEssenceEarned} Void Essence earned
-              </div>
-            )}
-
             {/* Achievement Progress */}
             {achievementCount.total > 0 && (
-              <div
-                style={{
-                  marginTop: 12,
-                  fontSize: "0.8rem",
-                  color: "rgba(224,224,240,0.4)",
-                  letterSpacing: "0.1em",
-                }}
-              >
+              <div style={{
+                fontSize: "0.78rem",
+                color: "rgba(224,224,240,0.35)",
+                letterSpacing: "0.1em",
+              }}>
                 Achievements: {achievementCount.unlocked} / {achievementCount.total}
               </div>
             )}
 
+            {/* Action Buttons */}
             <div
               style={{
                 display: "flex",
-                gap: 16,
-                marginTop: 24,
+                gap: 12,
+                marginTop: 8,
                 justifyContent: "center",
                 flexWrap: "wrap",
+                width: "100%",
               }}
             >
               <button className="btn-neon-filled" onClick={restartGame}>
@@ -3494,7 +3541,7 @@ export default function PlayPage() {
                   transition: "opacity 0.2s, transform 0.2s",
                   opacity: shareStatus !== "idle" ? 0.85 : 1,
                   textShadow: "0 0 8px rgba(139,92,246,0.5)",
-                  minWidth: 150,
+                  minWidth: 140,
                 }}
                 onMouseEnter={(e) => { (e.target as HTMLElement).style.opacity = "0.85"; }}
                 onMouseLeave={(e) => { (e.target as HTMLElement).style.opacity = shareStatus !== "idle" ? "0.85" : "1"; }}
@@ -3503,15 +3550,16 @@ export default function PlayPage() {
                   ? "Shared! \u2713"
                   : shareStatus === "copied"
                   ? "Copied! \u2713"
-                  : "Share Score \u{1F517}"}
+                  : "Share \u{1F517}"}
               </button>
               <button className="btn-neon" onClick={backToMenu}>
-                MAIN MENU
+                MENU
               </button>
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* ============== Achievement Toast Notifications ============== */}
       {achievementToasts.length > 0 && (

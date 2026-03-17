@@ -96,6 +96,13 @@ interface EngineCallbacks {
     phantomKills: number;
     difficulty: string;
     scoreMult: number;
+    damageDealt: number;
+    damageTaken: number;
+    xpCollected: number;
+    elitesKilled: number;
+    longestCombo: number;
+    abilitiesUsed: string[];
+    lootCollected: number;
   }) => void;
   onAchievementCheck?: (stats: {
     score: number;
@@ -141,6 +148,14 @@ export class GameEngine {
   private phantomKillsThisRun: number = 0;
   private lastHudUpdate: number = 0;
   private lastAchievementCheck: number = 0;
+
+  // Enhanced run stats tracking
+  private damageDealt: number = 0;
+  private damageTaken: number = 0;
+  private xpCollected: number = 0;
+  private elitesKilled: number = 0;
+  private lootCollected: number = 0;
+  private longestCombo: number = 0;
 
   // Combo / kill streak tracking
   private comboCount: number = 0;
@@ -416,6 +431,12 @@ export class GameEngine {
     this.comboCount = 0;
     this.comboTimer = 0;
     this.maxCombo = 0;
+    this.damageDealt = 0;
+    this.damageTaken = 0;
+    this.xpCollected = 0;
+    this.elitesKilled = 0;
+    this.lootCollected = 0;
+    this.longestCombo = 0;
     this.dashCooldown = 0;
     this.dashTimer = 0;
     this.dashDirection = { x: 0, y: 0 };
@@ -817,6 +838,7 @@ export class GameEngine {
         const dailyXpMult = getModifierValue(this.dailyModifiers, 'xp_mult');
         const xpGain = Math.floor(orb.value * this.metaBonuses.xpMultiplier * this.characterDef.xpMultiplier * dailyXpMult * this.difficultyConfig.xpMult);
         p.xp += xpGain;
+        this.xpCollected += xpGain;
         this.state.score += Math.floor(orb.value * this.difficultyConfig.scoreMult);
         this.particles.emitXPPickup(orb.pos.x, orb.pos.y);
         this.audio.playPickup();
@@ -858,6 +880,7 @@ export class GameEngine {
       const dist = distance(p.pos, loot.pos);
       if (dist < p.radius + 20) {
         loot.active = false;
+        this.lootCollected++;
         this.applyLootEffect(loot.type);
         this.particles.emitExplosion(loot.pos.x, loot.pos.y, this.getLootColor(loot.type), 15);
         this.audio.playPickup();
@@ -942,6 +965,7 @@ export class GameEngine {
           const dailyDamageMult = getModifierValue(this.dailyModifiers, 'damage_mult');
           const actualDamage = Math.floor(proj.damage * this.metaBonuses.damageMultiplier * this.characterDef.damageMultiplier * dailyDamageMult);
           enemy.health -= actualDamage;
+          this.damageDealt += actualDamage;
           this.particles.emitDamageNumber(
             enemy.pos.x,
             enemy.pos.y,
@@ -958,6 +982,7 @@ export class GameEngine {
               const aoeDist = distance(proj.pos, other.pos);
               if (aoeDist < proj.aoe.radius) {
                 other.health -= aoeDamage;
+                this.damageDealt += aoeDamage;
                 this.particles.emitDamageNumber(other.pos.x, other.pos.y, aoeDamage);
                 this.particles.emit(other.pos.x, other.pos.y, 3, proj.color, 40, 0.15);
                 if (other.health <= 0) {
@@ -1015,6 +1040,7 @@ export class GameEngine {
 
     const reducedAmount = Math.max(1, amount - this.metaBonuses.armorBonus - this.characterDef.baseArmor);
     p.health -= reducedAmount;
+    this.damageTaken += reducedAmount;
     p.lastDamageTime = this.state.time;
     p.invincibleUntil = this.state.time + 1.0;
     this.state.screenShake = Math.min(15, 4 + amount * 0.5);
@@ -1046,11 +1072,17 @@ export class GameEngine {
     this.enemiesKilled++;
     this.renderer?.flashKillCount(1);
 
+    // Track elite kills (boss, tank, splitter are elite-tier enemies)
+    if (enemy.enemyType === 'boss' || enemy.enemyType === 'tank' || enemy.enemyType === 'splitter') {
+      this.elitesKilled++;
+    }
+
     // Combo tracking
     this.comboCount++;
     this.comboTimer = this.COMBO_TIMEOUT;
     if (this.comboCount > this.maxCombo) {
       this.maxCombo = this.comboCount;
+      this.longestCombo = this.comboCount;
     }
 
     // Score multiplier based on combo (enhanced tiers)
@@ -1533,6 +1565,13 @@ export class GameEngine {
         phantomKills: this.phantomKillsThisRun,
         difficulty: this.difficultyConfig.name,
         scoreMult: this.difficultyConfig.scoreMult,
+        damageDealt: this.damageDealt,
+        damageTaken: this.damageTaken,
+        xpCollected: this.xpCollected,
+        elitesKilled: this.elitesKilled,
+        longestCombo: this.longestCombo,
+        abilitiesUsed: this.state.player.abilities.map((a) => a.name),
+        lootCollected: this.lootCollected,
       });
     }
   }

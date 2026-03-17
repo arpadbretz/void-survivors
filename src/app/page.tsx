@@ -239,6 +239,7 @@ export default function HomePage() {
         <nav style={{ display: "flex", gap: 24, alignItems: "center" }}>
           <a
             href="#features"
+            aria-label="View game features"
             style={{
               color: "rgba(224,224,240,0.5)",
               textDecoration: "none",
@@ -251,6 +252,7 @@ export default function HomePage() {
           </a>
           <a
             href="#how-to-play"
+            aria-label="Learn how to play Void Survivors"
             style={{
               color: "rgba(224,224,240,0.5)",
               textDecoration: "none",
@@ -263,6 +265,7 @@ export default function HomePage() {
           </a>
           <a
             href="#controls"
+            aria-label="View keyboard controls"
             style={{
               color: "rgba(224,224,240,0.5)",
               textDecoration: "none",
@@ -275,6 +278,7 @@ export default function HomePage() {
           </a>
           <a
             href="#whats-new"
+            aria-label="See latest updates and patch notes"
             style={{
               color: "rgba(224,224,240,0.5)",
               textDecoration: "none",
@@ -285,9 +289,23 @@ export default function HomePage() {
           >
             What&apos;s New
           </a>
+          <a
+            href="#faq"
+            aria-label="Frequently asked questions about Void Survivors"
+            style={{
+              color: "rgba(224,224,240,0.5)",
+              textDecoration: "none",
+              fontSize: "0.9rem",
+              letterSpacing: "0.05em",
+              transition: "color 0.2s",
+            }}
+          >
+            FAQ
+          </a>
           <Link
             href="/play"
             className="btn-neon"
+            aria-label="Play Void Survivors now"
             style={{ padding: "8px 20px", fontSize: "0.85rem" }}
           >
             PLAY
@@ -337,6 +355,7 @@ export default function HomePage() {
         <Link
           href="/play"
           className="btn-neon-filled animate-pulse-glow"
+          aria-label="Play Void Survivors now - free browser game"
           style={{ marginTop: 40 }}
         >
           PLAY NOW
@@ -944,6 +963,219 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* ===================== FAQ ===================== */}
+      <section
+        id="faq"
+        style={{
+          position: "relative",
+          zIndex: 10,
+          padding: "80px clamp(20px, 5vw, 60px)",
+        }}
+      >
+        <h2
+          style={{
+            textAlign: "center",
+            fontSize: "clamp(1.5rem, 4vw, 2.2rem)",
+            fontWeight: 800,
+            color: "#e0e0f0",
+            marginBottom: 48,
+            letterSpacing: "0.03em",
+          }}
+        >
+          Frequently Asked Questions
+        </h2>
+
+        <div
+          style={{
+            maxWidth: 680,
+            margin: "0 auto",
+            display: "flex",
+            flexDirection: "column",
+            gap: 12,
+          }}
+        >
+          <details
+            className="glass"
+            style={{
+              padding: "0",
+              borderRadius: 12,
+              overflow: "hidden",
+            }}
+          >
+            <summary
+              style={{
+                padding: "20px 24px",
+                cursor: "pointer",
+                fontSize: "1rem",
+                fontWeight: 700,
+                color: "#00f0ff",
+                listStyle: "none",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              Is Void Survivors free?
+            </summary>
+            <p
+              style={{
+                padding: "0 24px 20px",
+                margin: 0,
+                fontSize: "0.95rem",
+                color: "rgba(224,224,240,0.65)",
+                lineHeight: 1.6,
+              }}
+            >
+              Yes! Void Survivors is 100% free to play with no ads, no microtransactions, and no account required. Just open the game in your browser and start playing instantly.
+            </p>
+          </details>
+
+          <details
+            className="glass"
+            style={{
+              padding: "0",
+              borderRadius: 12,
+              overflow: "hidden",
+            }}
+          >
+            <summary
+              style={{
+                padding: "20px 24px",
+                cursor: "pointer",
+                fontSize: "1rem",
+                fontWeight: 700,
+                color: "#00f0ff",
+                listStyle: "none",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              Does it work on mobile?
+            </summary>
+            <p
+              style={{
+                padding: "0 24px 20px",
+                margin: 0,
+                fontSize: "0.95rem",
+                color: "rgba(224,224,240,0.65)",
+                lineHeight: 1.6,
+              }}
+            >
+              Yes! The game features touch controls with a virtual joystick and dash button. Install it as a PWA for the best mobile experience with offline play support.
+            </p>
+          </details>
+
+          <details
+            className="glass"
+            style={{
+              padding: "0",
+              borderRadius: 12,
+              overflow: "hidden",
+            }}
+          >
+            <summary
+              style={{
+                padding: "20px 24px",
+                cursor: "pointer",
+                fontSize: "1rem",
+                fontWeight: 700,
+                color: "#00f0ff",
+                listStyle: "none",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              Do I need to download anything?
+            </summary>
+            <p
+              style={{
+                padding: "0 24px 20px",
+                margin: 0,
+                fontSize: "0.95rem",
+                color: "rgba(224,224,240,0.65)",
+                lineHeight: 1.6,
+              }}
+            >
+              No. Void Survivors runs entirely in your browser with no downloads or plugins required. You can optionally install it as a Progressive Web App for offline play.
+            </p>
+          </details>
+
+          <details
+            className="glass"
+            style={{
+              padding: "0",
+              borderRadius: 12,
+              overflow: "hidden",
+            }}
+          >
+            <summary
+              style={{
+                padding: "20px 24px",
+                cursor: "pointer",
+                fontSize: "1rem",
+                fontWeight: 700,
+                color: "#00f0ff",
+                listStyle: "none",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              How many characters are there?
+            </summary>
+            <p
+              style={{
+                padding: "0 24px 20px",
+                margin: 0,
+                fontSize: "0.95rem",
+                color: "rgba(224,224,240,0.65)",
+                lineHeight: 1.6,
+              }}
+            >
+              There are 3 playable characters, each with unique stats and starting abilities: Void Walker, Phantom, and Sentinel. Each character offers a different playstyle.
+            </p>
+          </details>
+
+          <details
+            className="glass"
+            style={{
+              padding: "0",
+              borderRadius: 12,
+              overflow: "hidden",
+            }}
+          >
+            <summary
+              style={{
+                padding: "20px 24px",
+                cursor: "pointer",
+                fontSize: "1rem",
+                fontWeight: 700,
+                color: "#00f0ff",
+                listStyle: "none",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              What&apos;s the Daily Challenge?
+            </summary>
+            <p
+              style={{
+                padding: "0 24px 20px",
+                margin: 0,
+                fontSize: "0.95rem",
+                color: "rgba(224,224,240,0.65)",
+                lineHeight: 1.6,
+              }}
+            >
+              Every day features a new challenge with unique modifiers that change how the game plays. Compete against yourself for the best daily score!
+            </p>
+          </details>
+        </div>
+      </section>
+
       {/* ===================== CTA ===================== */}
       <section
         style={{
@@ -972,7 +1204,7 @@ export default function HomePage() {
         >
           No signup required. Just click and play.
         </p>
-        <Link href="/play" className="btn-neon-filled">
+        <Link href="/play" className="btn-neon-filled" aria-label="Play Void Survivors now">
           PLAY NOW
         </Link>
       </section>

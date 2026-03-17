@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 const SITE_URL = "https://void-survivors.vercel.app";
 const TITLE = "Void Survivors — A Neon Roguelike";
 const DESCRIPTION =
-  "Survive endless waves of geometric enemies in this free browser-based action roguelike. 9 abilities with 4 evolutions, 6 enemy types with elite variants, 3 playable characters, 25 achievements, and meta-progression. No downloads — just pure neon chaos.";
+  "Play Void Survivors free in your browser — a neon roguelike survivors game with 10 abilities, 5 evolutions, 7 enemy types, 3 bosses, 3 characters, 40 achievements, daily challenges, and meta-progression. No download required. Works on desktop and mobile.";
 const OG_IMAGE = `${SITE_URL}/api/og`;
 
 export const metadata: Metadata = {
@@ -37,6 +37,11 @@ export const metadata: Metadata = {
     "HTML5 game",
     "no download",
     "online game",
+    "io game",
+    "web game",
+    "free game",
+    "survivors game",
+    "play in browser",
   ],
   authors: [{ name: "Prometheus Digital Kft." }],
   creator: "Prometheus Digital Kft.",
@@ -92,37 +97,85 @@ export const viewport: Viewport = {
   themeColor: "#0a0a12",
 };
 
-const jsonLd = {
-  "@context": "https://schema.org",
-  "@type": "VideoGame",
-  name: "Void Survivors",
-  url: SITE_URL,
-  image: OG_IMAGE,
-  description: DESCRIPTION,
-  genre: ["Roguelike", "Action", "Bullet Hell", "Survivors"],
-  gamePlatform: ["Web Browser"],
-  applicationCategory: "Game",
-  operatingSystem: "Any",
-  offers: {
-    "@type": "Offer",
-    price: "0",
-    priceCurrency: "USD",
-    availability: "https://schema.org/InStock",
+const jsonLd = [
+  {
+    "@context": "https://schema.org",
+    "@type": "VideoGame",
+    name: "Void Survivors",
+    url: SITE_URL,
+    image: OG_IMAGE,
+    description: DESCRIPTION,
+    genre: ["Roguelike", "Action", "Bullet Hell", "Survivors", "io Game"],
+    gamePlatform: ["Web Browser"],
+    applicationCategory: "Game",
+    operatingSystem: "Any",
+    offers: {
+      "@type": "Offer",
+      price: "0",
+      priceCurrency: "USD",
+      availability: "https://schema.org/InStock",
+    },
+    author: {
+      "@type": "Organization",
+      name: "Prometheus Digital Kft.",
+    },
+    publisher: {
+      "@type": "Organization",
+      name: "Prometheus Digital Kft.",
+    },
+    playMode: "SinglePlayer",
+    numberOfPlayers: {
+      "@type": "QuantitativeValue",
+      value: 1,
+    },
   },
-  author: {
-    "@type": "Organization",
-    name: "Prometheus Digital Kft.",
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: [
+      {
+        "@type": "Question",
+        name: "Is Void Survivors free?",
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: "Yes! Void Survivors is 100% free to play with no ads, no microtransactions, and no account required. Just open the game in your browser and start playing instantly.",
+        },
+      },
+      {
+        "@type": "Question",
+        name: "Does Void Survivors work on mobile?",
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: "Yes! The game features touch controls with a virtual joystick and dash button. Install it as a PWA for the best mobile experience with offline play support.",
+        },
+      },
+      {
+        "@type": "Question",
+        name: "Do I need to download anything to play Void Survivors?",
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: "No. Void Survivors runs entirely in your browser with no downloads or plugins required. You can optionally install it as a Progressive Web App for offline play.",
+        },
+      },
+      {
+        "@type": "Question",
+        name: "How many characters are there in Void Survivors?",
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: "There are 3 playable characters, each with unique stats and starting abilities: Void Walker, Phantom, and Sentinel. Each character offers a different playstyle.",
+        },
+      },
+      {
+        "@type": "Question",
+        name: "What is the Daily Challenge in Void Survivors?",
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: "Every day features a new challenge with unique modifiers that change how the game plays. Compete against yourself for the best daily score!",
+        },
+      },
+    ],
   },
-  publisher: {
-    "@type": "Organization",
-    name: "Prometheus Digital Kft.",
-  },
-  playMode: "SinglePlayer",
-  numberOfPlayers: {
-    "@type": "QuantitativeValue",
-    value: 1,
-  },
-};
+];
 
 export default function RootLayout({
   children,
