@@ -390,13 +390,13 @@ export default function HomePage() {
         >
           <FeatureCard
             icon={"⚡"}
-            title="9 Abilities + 4 Evolutions"
-            description="Chain Lightning, Orbit Shield, Missile Swarm and more. Max out abilities to unlock powerful Evolutions that transform your build."
+            title="10 Abilities + 5 Evolutions"
+            description="Chain Lightning, Orbit Shield, Missile Swarm, Gravity Well and more. Max out abilities to unlock powerful Evolutions like Singularity that transform your build."
           />
           <FeatureCard
             icon={"👾"}
-            title="6 Enemy Types + Elites"
-            description="Face 6 distinct enemy types, each with dangerous Elite variants. From swarming drones to hulking tanks, every wave tests your reflexes."
+            title="7 Enemy Types + Elites"
+            description="Face 7 distinct enemy types including the elusive Phantom, each with dangerous Elite variants. From swarming drones to hulking tanks, every wave tests your reflexes."
           />
           <FeatureCard
             icon={"🏆"}
@@ -422,6 +422,11 @@ export default function HomePage() {
             icon={"🌐"}
             title="Zero Downloads"
             description="Runs entirely in your browser, on any device. Jump in instantly from desktop or mobile."
+          />
+          <FeatureCard
+            icon={"🔊"}
+            title="Settings & Audio"
+            description="Fine-tune your experience with volume controls, separate SFX and music sliders, and display options to suit your setup."
           />
           <FeatureCard
             icon={"💎"}
@@ -785,7 +790,39 @@ export default function HomePage() {
                 textTransform: "uppercase",
               }}
             >
-              v0.8 &mdash; Latest
+              v1.2 &mdash; Latest
+            </div>
+            <p
+              style={{
+                fontSize: "0.95rem",
+                color: "rgba(224,224,240,0.65)",
+                lineHeight: 1.6,
+                margin: 0,
+              }}
+            >
+              Phantom Enemy, Gravity Well &amp; Settings. A new ghostly Phantom enemy type, the Gravity Well ability with its Singularity evolution, and a full settings menu with volume controls and display options.
+            </p>
+          </div>
+
+          <div
+            className="glass"
+            style={{
+              padding: "20px 24px",
+              borderRadius: 12,
+              borderLeft: "3px solid #00f0ff",
+            }}
+          >
+            <div
+              style={{
+                fontSize: "0.75rem",
+                letterSpacing: "0.12em",
+                color: "#00f0ff",
+                fontWeight: 700,
+                marginBottom: 6,
+                textTransform: "uppercase",
+              }}
+            >
+              v0.8
             </div>
             <p
               style={{
