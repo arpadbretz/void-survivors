@@ -27,7 +27,8 @@ function createPlayerProjectile(
   lifetime: number,
   color: string,
   glowColor: string,
-  radius: number = 4
+  radius: number = 4,
+  aoe?: { radius: number; damageFraction: number }
 ): Projectile {
   return {
     id: projId(),
@@ -45,6 +46,7 @@ function createPlayerProjectile(
     lifetime,
     owner: 'player',
     angle: a,
+    aoe,
   };
 }
 
@@ -66,6 +68,27 @@ function radialShot(): Ability {
       if (gameTime - this.lastUsed < cd) return [];
 
       this.lastUsed = gameTime;
+
+      // Evolved: Nova Burst
+      if (this.evolved) {
+        const count = 16;
+        const damage = 70;
+        const result: Projectile[] = [];
+        for (let i = 0; i < count; i++) {
+          const a = (i / count) * Math.PI * 2;
+          result.push(
+            createPlayerProjectile(
+              player.pos.x, player.pos.y,
+              a, 280, damage, 0, 1.5,
+              '#ff00ff', '#cc00cc', 6,
+              { radius: 60, damageFraction: 0.3 }
+            )
+          );
+        }
+        particles.emit(player.pos.x, player.pos.y, 12, '#ff00ff', 80, 0.4);
+        return result;
+      }
+
       const count = 4 + this.level * 2;
       const damage = 15 + this.level * 8;
       const result: Projectile[] = [];
@@ -99,6 +122,37 @@ function autoCannon(): Ability {
     cooldown: 0.4,
     lastUsed: -999,
     onUpdate(player, enemies, _proj, particles, dt, gameTime) {
+      // Evolved: Railgun
+      if (this.evolved) {
+        const cd = 0.8;
+        if (gameTime - this.lastUsed < cd) return [];
+        this.lastUsed = gameTime;
+
+        const range = 500;
+        let nearest: Enemy | null = null;
+        let nearDist = range;
+        for (const enemy of enemies) {
+          if (!enemy.active) continue;
+          const dx = enemy.pos.x - player.pos.x;
+          const dy = enemy.pos.y - player.pos.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < nearDist) {
+            nearDist = dist;
+            nearest = enemy;
+          }
+        }
+        if (!nearest) return [];
+        const a = Math.atan2(nearest.pos.y - player.pos.y, nearest.pos.x - player.pos.x);
+        particles.emit(player.pos.x, player.pos.y, 6, '#ffdd00', 60, 0.25);
+        return [
+          createPlayerProjectile(
+            player.pos.x, player.pos.y,
+            a, 800, 100, 5, 1.5,
+            '#ffdd00', '#ffaa00', 6
+          ),
+        ];
+      }
+
       const cd = Math.max(0.15, this.cooldown - (this.level - 1) * 0.05);
       if (gameTime - this.lastUsed < cd) return [];
       this.lastUsed = gameTime;
@@ -194,10 +248,63 @@ function chainLightning(): Ability {
     color: '#aaddff',
     cooldown: 1.5,
     lastUsed: -999,
+    activationCount: 0,
     onUpdate(player, enemies, _proj, particles, dt, gameTime) {
       const cd = Math.max(0.5, this.cooldown - this.level * 0.2);
       if (gameTime - this.lastUsed < cd) return [];
       this.lastUsed = gameTime;
+      this.activationCount = (this.activationCount || 0) + 1;
+
+      // Evolved: Thunder Storm
+      if (this.evolved) {
+        const chains = 8;
+        const damage = 80;
+        const range = 350;
+        const result: Projectile[] = [];
+
+        let current = player.pos;
+        const hit = new Set<string>();
+        const hitPositions: { x: number; y: number }[] = [];
+
+        for (let c = 0; c < chains; c++) {
+          let nearest: Enemy | null = null;
+          let nearDist = range;
+          for (const enemy of enemies) {
+            if (!enemy.active || hit.has(enemy.id)) continue;
+            const d = distance(current, enemy.pos);
+            if (d < nearDist) {
+              nearDist = d;
+              nearest = enemy;
+            }
+          }
+          if (!nearest) break;
+          hit.add(nearest.id);
+          nearest.health -= damage;
+          particles.emit(nearest.pos.x, nearest.pos.y, 8, '#ffffff', 100, 0.4);
+          particles.emitDamageNumber(nearest.pos.x, nearest.pos.y, damage);
+          hitPositions.push({ x: nearest.pos.x, y: nearest.pos.y });
+          current = nearest.pos;
+        }
+
+        // Every 3rd activation, spawn cross-pattern lightning bolts from each hit enemy
+        if (this.activationCount % 3 === 0) {
+          for (const pos of hitPositions) {
+            const crossAngles = [0, Math.PI / 2, Math.PI, Math.PI * 1.5];
+            for (const a of crossAngles) {
+              result.push(
+                createPlayerProjectile(
+                  pos.x, pos.y,
+                  a, 350, 40, 1, 0.8,
+                  '#ffffff', '#aaddff', 4
+                )
+              );
+            }
+          }
+          particles.emit(player.pos.x, player.pos.y, 15, '#ffffff', 120, 0.5);
+        }
+
+        return result;
+      }
 
       const chains = 1 + this.level;
       const damage = 20 + this.level * 10;
@@ -288,6 +395,33 @@ function missileSwarm(): Ability {
     cooldown: 2.5,
     lastUsed: -999,
     onUpdate(player, enemies, _proj, particles, dt, gameTime) {
+      // Evolved: Void Artillery
+      if (this.evolved) {
+        const cd = 2.0;
+        if (gameTime - this.lastUsed < cd) return [];
+        this.lastUsed = gameTime;
+
+        const missileCount = 8;
+        const damage = 100;
+        const result: Projectile[] = [];
+        const activeEnemies = enemies.filter((e) => e.active);
+        if (activeEnemies.length === 0) return [];
+
+        for (let i = 0; i < missileCount; i++) {
+          const target = activeEnemies[Math.floor(Math.random() * activeEnemies.length)];
+          const a = angle(player.pos, target.pos) + randomRange(-0.2, 0.2);
+          result.push(
+            createPlayerProjectile(
+              player.pos.x, player.pos.y,
+              a, 320, damage, 0, 2.0,
+              '#ff0044', '#cc0033', 8
+            )
+          );
+        }
+        particles.emit(player.pos.x, player.pos.y, 10, '#ff0044', 60, 0.3);
+        return result;
+      }
+
       const cd = Math.max(1.0, this.cooldown - this.level * 0.3);
       if (gameTime - this.lastUsed < cd) return [];
       this.lastUsed = gameTime;
@@ -473,6 +607,13 @@ export function getRandomUpgradeChoices(player: Player, count: number = 3): Abil
   return choices.slice(0, count);
 }
 
+const EVOLUTION_MAP: Record<string, { name: string; icon: string; color: string }> = {
+  radial_shot: { name: 'Nova Burst', icon: '🌟', color: '#ff00ff' },
+  auto_cannon: { name: 'Railgun', icon: '⚡', color: '#ffdd00' },
+  chain_lightning: { name: 'Thunder Storm', icon: '🌩️', color: '#ffffff' },
+  missile_swarm: { name: 'Void Artillery', icon: '☄️', color: '#ff0044' },
+};
+
 export function applyUpgradeChoice(player: Player, choice: Ability): void {
   const existing = player.abilities.find((a) => a.id === choice.id);
 
@@ -481,6 +622,18 @@ export function applyUpgradeChoice(player: Player, choice: Ability): void {
     // Reapply onAcquire for stacking passives
     if (existing.onAcquire) {
       existing.onAcquire(player);
+    }
+
+    // Check for evolution at max level
+    if (existing.level >= existing.maxLevel && !existing.evolved) {
+      const evo = EVOLUTION_MAP[existing.id];
+      if (evo) {
+        existing.evolved = true;
+        existing.evolvedName = evo.name;
+        existing.name = evo.name;
+        existing.icon = evo.icon;
+        existing.color = evo.color;
+      }
     }
   } else {
     // New ability
@@ -496,6 +649,20 @@ export function applyUpgradeChoice(player: Player, choice: Ability): void {
 }
 
 export function getAbilityDescription(ability: Ability, level: number): string {
+  // Show evolved descriptions when at max level
+  if (ability.evolved || level >= ability.maxLevel) {
+    switch (ability.id) {
+      case 'radial_shot':
+        return `EVOLVED: Nova Burst — 16 explosive projectiles, 70 damage each. AoE explosion on hit (60px, 30% damage).`;
+      case 'auto_cannon':
+        return `EVOLVED: Railgun — Piercing energy beam, 100 damage, pierces 5 enemies. 0.8s cooldown.`;
+      case 'chain_lightning':
+        return `EVOLVED: Thunder Storm — Chains to 8 targets, 80 damage. Every 3rd cast spawns lightning bolts.`;
+      case 'missile_swarm':
+        return `EVOLVED: Void Artillery — 8 massive missiles, 100 damage each. 2.0s cooldown.`;
+    }
+  }
+
   switch (ability.id) {
     case 'auto_cannon':
       return `Auto-fires at nearest enemy. ${8 + level * 4} damage, ${(0.4 - (level - 1) * 0.05).toFixed(2)}s cooldown.${level >= 3 ? ` Piercing ${level >= 5 ? 2 : 1}.` : ''}`;

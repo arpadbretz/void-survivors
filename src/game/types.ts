@@ -49,6 +49,7 @@ export interface Projectile extends Entity {
   lifetime: number;
   owner: 'player' | 'enemy';
   angle: number;
+  aoe?: { radius: number; damageFraction: number };
 }
 
 export interface Particle {
@@ -81,6 +82,9 @@ export interface Ability {
   color: string;
   cooldown: number;
   lastUsed: number;
+  evolved?: boolean;
+  evolvedName?: string;
+  activationCount?: number;
   onUpdate: (
     player: Player,
     enemies: Enemy[],

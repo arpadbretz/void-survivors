@@ -678,6 +678,24 @@ export class GameEngine {
           this.particles.emit(proj.pos.x, proj.pos.y, 4, enemy.color, 60, 0.2);
           this.audio.playHit();
 
+          // AoE explosion (e.g. Nova Burst)
+          if (proj.aoe) {
+            const aoeDamage = Math.floor(actualDamage * proj.aoe.damageFraction);
+            for (const other of s.enemies) {
+              if (!other.active || other.id === enemy.id) continue;
+              const aoeDist = distance(proj.pos, other.pos);
+              if (aoeDist < proj.aoe.radius) {
+                other.health -= aoeDamage;
+                this.particles.emitDamageNumber(other.pos.x, other.pos.y, aoeDamage);
+                this.particles.emit(other.pos.x, other.pos.y, 3, proj.color, 40, 0.15);
+                if (other.health <= 0) {
+                  this.killEnemy(other);
+                }
+              }
+            }
+            this.particles.emitExplosion(proj.pos.x, proj.pos.y, proj.color, 8);
+          }
+
           if (proj.piercing <= 0) {
             proj.active = false;
           } else {

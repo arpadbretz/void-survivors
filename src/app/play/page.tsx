@@ -179,6 +179,9 @@ export default function PlayPage() {
   const [joystickDelta, setJoystickDelta] = useState({ x: 0, y: 0 });
   const joystickCenter = useRef({ x: 0, y: 0 });
 
+  // Fullscreen state
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
   // -----------------------------------------------------------------------
   // Load high scores, achievements, and stats on mount
   // -----------------------------------------------------------------------
@@ -499,7 +502,7 @@ export default function PlayPage() {
       const touch = e.touches[0];
       const dx = touch.clientX - joystickCenter.current.x;
       const dy = touch.clientY - joystickCenter.current.y;
-      const maxDist = 38;
+      const maxDist = 48;
       const dist = Math.min(Math.sqrt(dx * dx + dy * dy), maxDist);
       const angle = Math.atan2(dy, dx);
       setJoystickDelta({
@@ -516,7 +519,7 @@ export default function PlayPage() {
       const touch = e.touches[0];
       const dx = touch.clientX - joystickCenter.current.x;
       const dy = touch.clientY - joystickCenter.current.y;
-      const maxDist = 38;
+      const maxDist = 48;
       const dist = Math.min(Math.sqrt(dx * dx + dy * dy), maxDist);
       const angle = Math.atan2(dy, dx);
       setJoystickDelta({
@@ -530,6 +533,47 @@ export default function PlayPage() {
   const onJoystickEnd = useCallback(() => {
     setJoystickActive(false);
     setJoystickDelta({ x: 0, y: 0 });
+  }, []);
+
+  // -----------------------------------------------------------------------
+  // Dash button handler (mobile) — dispatches Space keydown to engine
+  // -----------------------------------------------------------------------
+  const onDashPress = useCallback(() => {
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", { code: "Space", key: " ", bubbles: true })
+    );
+  }, []);
+
+  // -----------------------------------------------------------------------
+  // Fullscreen toggle
+  // -----------------------------------------------------------------------
+  const toggleFullscreen = useCallback(() => {
+    try {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().then(() => {
+          setIsFullscreen(true);
+        }).catch(() => {
+          // Fullscreen not supported or denied
+        });
+      } else {
+        document.exitFullscreen().then(() => {
+          setIsFullscreen(false);
+        }).catch(() => {
+          // Exit fullscreen failed
+        });
+      }
+    } catch {
+      // Fullscreen API not available
+    }
+  }, []);
+
+  // Listen for fullscreen changes (e.g. user presses Escape to exit)
+  useEffect(() => {
+    const onFsChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener("fullscreenchange", onFsChange);
+    return () => document.removeEventListener("fullscreenchange", onFsChange);
   }, []);
 
   // -----------------------------------------------------------------------
@@ -1343,14 +1387,14 @@ export default function PlayPage() {
               position: "absolute",
               top: 12,
               left: 12,
-              minWidth: 180,
+              minWidth: isMobile ? 140 : 180,
             }}
           >
             <div
               style={{
                 display: "flex",
                 justifyContent: "space-between",
-                fontSize: "0.75rem",
+                fontSize: isMobile ? "0.65rem" : "0.75rem",
                 color: "rgba(224,224,240,0.7)",
                 marginBottom: 4,
               }}
@@ -1389,7 +1433,7 @@ export default function PlayPage() {
               left: "50%",
               transform: "translateX(-50%)",
               fontFamily: "var(--font-geist-mono), monospace",
-              fontSize: "1.1rem",
+              fontSize: isMobile ? "0.85rem" : "1.1rem",
               letterSpacing: "0.1em",
               color: "#00f0ff",
             }}
@@ -1462,7 +1506,7 @@ export default function PlayPage() {
             <span
               style={{
                 fontFamily: "var(--font-geist-mono), monospace",
-                fontSize: "0.9rem",
+                fontSize: isMobile ? "0.75rem" : "0.9rem",
                 color: "#00f0ff",
               }}
             >
@@ -1484,16 +1528,16 @@ export default function PlayPage() {
             </button>
           </div>
 
-          {/* Left side: Ability icons */}
+          {/* Ability icons — vertical on desktop, compact horizontal row on mobile */}
           {hud.abilities.length > 0 && (
             <div
               style={{
                 position: "absolute",
-                left: 12,
-                top: 80,
+                ...(isMobile
+                  ? { left: 12, right: 12, top: 80, flexDirection: "row" as const, flexWrap: "wrap" as const }
+                  : { left: 12, top: 80, flexDirection: "column" as const }),
                 display: "flex",
-                flexDirection: "column",
-                gap: 6,
+                gap: isMobile ? 4 : 6,
               }}
             >
               {hud.abilities.map((ab, i) => (
@@ -1501,8 +1545,8 @@ export default function PlayPage() {
                   key={i}
                   className="hud-panel"
                   style={{
-                    width: 40,
-                    height: 40,
+                    width: isMobile ? 32 : 40,
+                    height: isMobile ? 32 : 40,
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -1512,7 +1556,7 @@ export default function PlayPage() {
                   }}
                   title={`${ab.name} (Lv.${ab.level})`}
                 >
-                  <span style={{ fontSize: "1.2rem" }}>{ab.icon}</span>
+                  <span style={{ fontSize: isMobile ? "0.9rem" : "1.2rem" }}>{ab.icon}</span>
                   <span
                     style={{
                       position: "absolute",
@@ -1520,11 +1564,11 @@ export default function PlayPage() {
                       right: -2,
                       background: ab.color,
                       color: "#0a0a12",
-                      fontSize: "0.55rem",
+                      fontSize: isMobile ? "0.45rem" : "0.55rem",
                       fontWeight: 800,
                       borderRadius: 4,
                       padding: "0 3px",
-                      lineHeight: "14px",
+                      lineHeight: isMobile ? "12px" : "14px",
                     }}
                   >
                     {ab.level}
@@ -1534,14 +1578,14 @@ export default function PlayPage() {
             </div>
           )}
 
-          {/* Dash cooldown indicator */}
+          {/* Dash cooldown indicator (desktop only — mobile has dedicated button) */}
           <div
             style={{
               position: "absolute",
               bottom: 44,
               left: "50%",
               transform: "translateX(-50%)",
-              display: "flex",
+              display: isMobile ? "none" : "flex",
               flexDirection: "column",
               alignItems: "center",
               gap: 2,
@@ -1657,14 +1701,125 @@ export default function PlayPage() {
               onTouchEnd={onJoystickEnd}
               onTouchCancel={onJoystickEnd}
             >
+              <div className="virtual-joystick-ring" />
               <div
                 className="virtual-joystick-knob"
                 style={{
-                  transform: `translate(calc(-50% + ${joystickDelta.x * 38}px), calc(-50% + ${joystickDelta.y * 38}px))`,
+                  transform: `translate(calc(-50% + ${joystickDelta.x * 48}px), calc(-50% + ${joystickDelta.y * 48}px))`,
                 }}
               />
             </div>
           )}
+
+          {/* Mobile: Dash button */}
+          {isMobile && (
+            <div
+              onTouchStart={(e) => {
+                e.stopPropagation();
+                onDashPress();
+              }}
+              style={{
+                position: "absolute",
+                bottom: 80,
+                right: 40,
+                width: 80,
+                height: 80,
+                borderRadius: "50%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                pointerEvents: "auto",
+                cursor: "pointer",
+                background: hud.dashCooldown > 0 ? "rgba(60,60,80,0.6)" : "rgba(0,240,255,0.12)",
+                border: `2px solid ${hud.dashCooldown > 0 ? "rgba(0,240,255,0.15)" : "rgba(0,240,255,0.5)"}`,
+                boxShadow: hud.dashCooldown <= 0 ? "0 0 16px rgba(0,240,255,0.3), inset 0 0 12px rgba(0,240,255,0.1)" : "none",
+                transition: "all 0.15s ease",
+                overflow: "hidden",
+                touchAction: "none",
+              }}
+            >
+              {/* Cooldown overlay */}
+              {hud.dashCooldown > 0 && (
+                <div
+                  style={{
+                    position: "absolute",
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    height: `${(hud.dashCooldown / 1.5) * 100}%`,
+                    background: "rgba(0,0,0,0.4)",
+                    transition: "height 0.1s linear",
+                    borderRadius: "0 0 50% 50%",
+                  }}
+                />
+              )}
+              {/* Cooldown ring SVG */}
+              <svg
+                width={80}
+                height={80}
+                style={{ position: "absolute", top: 0, left: 0 }}
+              >
+                <circle
+                  cx={40}
+                  cy={40}
+                  r={37}
+                  fill="none"
+                  stroke={hud.dashCooldown <= 0 ? "#00f0ff" : "rgba(0,240,255,0.25)"}
+                  strokeWidth={2}
+                  strokeDasharray={2 * Math.PI * 37}
+                  strokeDashoffset={
+                    hud.dashCooldown <= 0
+                      ? 0
+                      : (hud.dashCooldown / 1.5) * 2 * Math.PI * 37
+                  }
+                  transform="rotate(-90 40 40)"
+                  style={{ transition: "stroke-dashoffset 0.1s linear" }}
+                />
+              </svg>
+              <span
+                style={{
+                  position: "relative",
+                  zIndex: 1,
+                  fontSize: "0.75rem",
+                  fontWeight: 800,
+                  letterSpacing: "0.08em",
+                  color: hud.dashCooldown <= 0 ? "#00f0ff" : "rgba(0,240,255,0.3)",
+                  textShadow: hud.dashCooldown <= 0 ? "0 0 8px #00f0ff" : "none",
+                  fontFamily: "var(--font-geist-mono), monospace",
+                  userSelect: "none",
+                }}
+              >
+                DASH
+              </span>
+            </div>
+          )}
+
+          {/* Fullscreen toggle button */}
+          <button
+            onClick={toggleFullscreen}
+            style={{
+              position: "absolute",
+              top: isMobile ? 10 : 12,
+              right: isMobile ? 140 : 160,
+              width: 32,
+              height: 32,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: "rgba(10,10,18,0.5)",
+              border: "1px solid rgba(0,240,255,0.2)",
+              borderRadius: 6,
+              color: "rgba(224,224,240,0.5)",
+              cursor: "pointer",
+              fontSize: "1rem",
+              pointerEvents: "auto",
+              padding: 0,
+              transition: "all 0.2s",
+            }}
+            title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+          >
+            {isFullscreen ? "\u2716" : "\u26F6"}
+          </button>
         </div>
       )}
 
@@ -1862,13 +2017,15 @@ export default function PlayPage() {
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
-            justifyContent: "center",
+            justifyContent: isMobile ? "flex-start" : "center",
             zIndex: 30,
             background: "rgba(10, 10, 18, 0.85)",
             backdropFilter: "blur(6px)",
+            overflowY: "auto",
+            WebkitOverflowScrolling: "touch",
           }}
         >
-          <div className="animate-scale-in" style={{ textAlign: "center" }}>
+          <div className="animate-scale-in" style={{ textAlign: "center", padding: isMobile ? "32px 12px" : undefined }}>
             <h2
               className="glow-red"
               style={{
@@ -1887,11 +2044,11 @@ export default function PlayPage() {
               style={{
                 display: "inline-grid",
                 gridTemplateColumns: "auto auto",
-                gap: "8px 24px",
-                padding: "24px 36px",
+                gap: isMobile ? "6px 16px" : "8px 24px",
+                padding: isMobile ? "16px 20px" : "24px 36px",
                 borderRadius: 12,
                 textAlign: "left",
-                fontSize: "0.95rem",
+                fontSize: isMobile ? "0.8rem" : "0.95rem",
               }}
             >
               <span style={{ color: "rgba(224,224,240,0.5)" }}>
