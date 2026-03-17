@@ -45,6 +45,10 @@ export interface Enemy extends Entity {
   spawnTime?: number;
   phaseTimer?: number;
   phaseState?: 'visible' | 'fading_out' | 'invisible' | 'fading_in';
+  bossVariant?: 'titan' | 'harbinger' | 'nexus';
+  bossSpawnTimer?: number;
+  bossTeleportTimer?: number;
+  _spawnedEnemies?: Vector2[]; // temp buffer for harbinger-spawned enemies
 }
 
 export interface Projectile extends Entity {
@@ -110,6 +114,18 @@ export interface ParticleSystemInterface {
   emitLevelUp: (x: number, y: number) => void;
 }
 
+export interface Hazard {
+  id: string;
+  pos: Vector2;
+  radius: number;
+  type: 'void_rift' | 'plasma_pool' | 'gravity_anomaly';
+  damage: number;        // damage per second while standing in it
+  active: boolean;
+  spawnTime: number;
+  lifetime: number;      // seconds until despawn
+  pulsePhase: number;    // for animation
+}
+
 export interface Camera {
   x: number;
   y: number;
@@ -134,9 +150,20 @@ export interface GameState {
   showUpgradeScreen: boolean;
   screenShake: number;
   camera: Camera;
+  hazards: Hazard[];
+  lootDrops: LootDrop[];
   enemiesKilled?: number;
   combo?: number;
   comboTimer?: number;
+}
+
+export interface LootDrop {
+  id: string;
+  pos: Vector2;
+  type: 'health' | 'bomb' | 'magnet' | 'shield';
+  active: boolean;
+  spawnTime: number;
+  lifetime: number; // disappears after this many seconds
 }
 
 export interface WaveConfig {

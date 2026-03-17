@@ -8,6 +8,8 @@ import {
   Enemy,
   Projectile,
   XPOrb,
+  Hazard,
+  LootDrop,
   Camera,
   InputState,
 } from './types';
@@ -27,6 +29,7 @@ import {
   updateEnemies,
   shouldSpawnBoss,
   createSplitEnemies,
+  createEnemy,
 } from './enemies';
 import {
   getRandomUpgradeChoices,
@@ -139,6 +142,11 @@ export class GameEngine {
   // Character selection
   private characterId: string = 'void_walker';
   private characterDef: CharacterDef = getCharacter('void_walker');
+
+  // Hazard spawn timers
+  private lastVoidRiftSpawn: number = 0;
+  private lastGravityAnomalySpawn: number = 0;
+  private hazardIdCounter: number = 0;
 
   // Daily challenge modifiers
   private dailyModifiers: DailyModifier[] = [];
@@ -343,6 +351,8 @@ export class GameEngine {
       showUpgradeScreen: false,
       screenShake: 0,
       camera,
+      hazards: [],
+      lootDrops: [],
     };
 
     // Apply meta-progression bonuses
@@ -374,6 +384,9 @@ export class GameEngine {
     this.dashDirection = { x: 0, y: 0 };
     this.enemyManager.reset();
     this.tutorialTriggered = new Set();
+    this.lastVoidRiftSpawn = 0;
+    this.lastGravityAnomalySpawn = 0;
+    this.hazardIdCounter = 0;
 
     // Reset input
     this.input.up = false;
@@ -512,6 +525,18 @@ export class GameEngine {
     const enemyProj = updateEnemies(s.enemies, s.player, dt, s.time, this.enemyManager.waveSpeedMultiplier);
     s.projectiles.push(...enemyProj);
 
+    // 4a. Handle harbinger boss spawned enemies
+    for (const enemy of s.enemies) {
+      if (enemy.active && enemy._spawnedEnemies && enemy._spawnedEnemies.length > 0) {
+        for (const spawnPos of enemy._spawnedEnemies) {
+          const chaser = createEnemy('chaser', spawnPos, s.wave);
+          chaser.spawnTime = s.time;
+          s.enemies.push(chaser);
+        }
+        enemy._spawnedEnemies = [];
+      }
+    }
+
     // 4b. Gravity well effects: pull enemies and deal tick damage
     for (const proj of s.projectiles) {
       if (!proj.active || !proj.isGravityWell) continue;
@@ -541,8 +566,14 @@ export class GameEngine {
     // 7. Particles
     this.particles.update(dt);
 
+    // 7b. Hazards
+    this.updateHazards(dt);
+
     // 8. XP orbs
     this.updateXPOrbs(dt);
+
+    // 8b. Loot drops
+    this.updateLootDrops(dt);
 
     // 9. Level up check
     this.checkLevelUp();
@@ -569,6 +600,7 @@ export class GameEngine {
     s.enemies = s.enemies.filter((e) => e.active);
     s.projectiles = s.projectiles.filter((p) => p.active);
     s.xpOrbs = s.xpOrbs.filter((o) => o.active);
+    s.lootDrops = s.lootDrops.filter((l) => l.active);
 
     // Hard caps to prevent unbounded growth
     if (s.projectiles.length > 300) {
@@ -733,6 +765,96 @@ export class GameEngine {
         this.particles.emitXPPickup(orb.pos.x, orb.pos.y);
         this.audio.playPickup();
       }
+    }
+  }
+
+  // ── Loot Drops ──────────────────────────────────────────────────
+
+  private nextLootId: number = 0;
+
+  private spawnLootDrop(x: number, y: number): void {
+    const types: LootDrop['type'][] = ['health', 'bomb', 'magnet', 'shield'];
+    const type = types[Math.floor(Math.random() * types.length)];
+    this.state.lootDrops.push({
+      id: `loot_${this.nextLootId++}`,
+      pos: { x, y },
+      type,
+      active: true,
+      spawnTime: this.state.time,
+      lifetime: 15,
+    });
+  }
+
+  private updateLootDrops(_dt: number): void {
+    const s = this.state;
+    const p = s.player;
+
+    for (const loot of s.lootDrops) {
+      if (!loot.active) continue;
+
+      // Expire after lifetime
+      if (s.time - loot.spawnTime >= loot.lifetime) {
+        loot.active = false;
+        continue;
+      }
+
+      // Check player pickup collision (radius 20 for loot)
+      const dist = distance(p.pos, loot.pos);
+      if (dist < p.radius + 20) {
+        loot.active = false;
+        this.applyLootEffect(loot.type);
+        this.particles.emitExplosion(loot.pos.x, loot.pos.y, this.getLootColor(loot.type), 15);
+        this.audio.playPickup();
+      }
+    }
+  }
+
+  private getLootColor(type: LootDrop['type']): string {
+    switch (type) {
+      case 'health': return '#00ff44';
+      case 'bomb': return '#ff2222';
+      case 'magnet': return '#2288ff';
+      case 'shield': return '#ffdd00';
+    }
+  }
+
+  private applyLootEffect(type: LootDrop['type']): void {
+    const s = this.state;
+    const p = s.player;
+
+    switch (type) {
+      case 'health':
+        // Restore 30% max health
+        p.health = Math.min(p.maxHealth, p.health + p.maxHealth * 0.3);
+        this.particles.emit(p.pos.x, p.pos.y, 12, '#00ff44', 80, 0.5);
+        break;
+      case 'bomb':
+        // Kill all enemies on screen
+        for (const enemy of s.enemies) {
+          if (!enemy.active) continue;
+          // Only kill enemies within viewport range (~600px of player)
+          const dist = distance(p.pos, enemy.pos);
+          if (dist < 800) {
+            this.killEnemy(enemy);
+          }
+        }
+        this.particles.emitExplosion(p.pos.x, p.pos.y, '#ff4444', 30);
+        s.screenShake = 12;
+        break;
+      case 'magnet':
+        // Pull all XP orbs to player instantly
+        for (const orb of s.xpOrbs) {
+          if (!orb.active) continue;
+          orb.pos.x = p.pos.x + (Math.random() - 0.5) * 10;
+          orb.pos.y = p.pos.y + (Math.random() - 0.5) * 10;
+        }
+        this.particles.emit(p.pos.x, p.pos.y, 15, '#2288ff', 120, 0.4);
+        break;
+      case 'shield':
+        // 5 seconds of invincibility
+        p.invincibleUntil = Math.max(p.invincibleUntil, s.time + 5);
+        this.particles.emit(p.pos.x, p.pos.y, 12, '#ffdd00', 80, 0.5);
+        break;
     }
   }
 
@@ -908,6 +1030,9 @@ export class GameEngine {
         30
       );
       this.state.screenShake = 15;
+
+      // Drop random loot
+      this.spawnLootDrop(enemy.pos.x, enemy.pos.y);
     }
 
     // Spawn 2-3 XP orbs spread around the death position
@@ -924,6 +1049,156 @@ export class GameEngine {
         active: true,
       });
     }
+
+    // 10% chance to spawn a plasma pool on enemy death
+    if (Math.random() < 0.10) {
+      this.spawnHazard('plasma_pool', enemy.pos.x, enemy.pos.y);
+    }
+  }
+
+  // ── Hazards ──────────────────────────────────────────────────
+
+  private spawnHazard(type: 'void_rift' | 'plasma_pool' | 'gravity_anomaly', x: number, y: number): void {
+    const s = this.state;
+
+    let radius: number;
+    let damage: number;
+    let lifetime: number;
+
+    switch (type) {
+      case 'void_rift':
+        radius = 60 + Math.random() * 40;
+        damage = 15;
+        lifetime = 12;
+        break;
+      case 'plasma_pool':
+        radius = 40 + Math.random() * 30;
+        damage = 20;
+        lifetime = 8;
+        break;
+      case 'gravity_anomaly':
+        radius = 80 + Math.random() * 40;
+        damage = 0;
+        lifetime = 15;
+        break;
+    }
+
+    // Enforce max 5 hazards — remove oldest if exceeded
+    while (s.hazards.length >= 5) {
+      s.hazards.shift();
+    }
+
+    s.hazards.push({
+      id: `hazard_${this.hazardIdCounter++}`,
+      pos: { x, y },
+      radius,
+      type,
+      damage,
+      active: true,
+      spawnTime: s.time,
+      lifetime,
+      pulsePhase: Math.random() * Math.PI * 2,
+    });
+  }
+
+  private updateHazards(dt: number): void {
+    const s = this.state;
+
+    // Spawn void rifts starting from wave 3, every 15 seconds
+    if (s.wave >= 3 && s.time - this.lastVoidRiftSpawn >= 15) {
+      this.lastVoidRiftSpawn = s.time;
+      const margin = 200;
+      const hx = margin + Math.random() * (WORLD_SIZE - margin * 2);
+      const hy = margin + Math.random() * (WORLD_SIZE - margin * 2);
+      this.spawnHazard('void_rift', hx, hy);
+    }
+
+    // Spawn gravity anomalies starting from wave 6, every 20 seconds
+    if (s.wave >= 6 && s.time - this.lastGravityAnomalySpawn >= 20) {
+      this.lastGravityAnomalySpawn = s.time;
+      const margin = 200;
+      const hx = margin + Math.random() * (WORLD_SIZE - margin * 2);
+      const hy = margin + Math.random() * (WORLD_SIZE - margin * 2);
+      this.spawnHazard('gravity_anomaly', hx, hy);
+    }
+
+    // Update hazard timers and apply effects
+    for (const hazard of s.hazards) {
+      if (!hazard.active) continue;
+
+      const age = s.time - hazard.spawnTime;
+      if (age >= hazard.lifetime) {
+        hazard.active = false;
+        continue;
+      }
+
+      // Warning phase: first 1 second, no effects
+      if (age < 1.0) continue;
+
+      // Player collision
+      const playerDist = distance(s.player.pos, hazard.pos);
+      if (playerDist < hazard.radius + s.player.radius) {
+        if (hazard.damage > 0) {
+          this.damagePlayer(hazard.damage * dt);
+        }
+        // Gravity anomaly pushes player away
+        if (hazard.type === 'gravity_anomaly') {
+          const pushStrength = 150 * (1 - playerDist / hazard.radius);
+          if (playerDist > 0) {
+            const pushDir = normalize(sub(s.player.pos, hazard.pos));
+            s.player.pos.x += pushDir.x * pushStrength * dt;
+            s.player.pos.y += pushDir.y * pushStrength * dt;
+          }
+        }
+      }
+
+      // Enemy interactions
+      for (const enemy of s.enemies) {
+        if (!enemy.active) continue;
+        const enemyDist = distance(enemy.pos, hazard.pos);
+        if (enemyDist >= hazard.radius + enemy.radius) continue;
+
+        switch (hazard.type) {
+          case 'void_rift':
+            enemy.health -= 5 * dt;
+            if (enemy.health <= 0) {
+              this.killEnemy(enemy);
+            }
+            break;
+          case 'plasma_pool': {
+            const slowFactor = Math.max(0, 1 - 0.5 * dt * 10);
+            enemy.vel.x *= slowFactor;
+            enemy.vel.y *= slowFactor;
+            break;
+          }
+          case 'gravity_anomaly':
+            if (enemyDist > 0) {
+              const pushStrength = 150 * (1 - enemyDist / hazard.radius);
+              const pushDir = normalize(sub(enemy.pos, hazard.pos));
+              enemy.pos.x += pushDir.x * pushStrength * dt;
+              enemy.pos.y += pushDir.y * pushStrength * dt;
+            }
+            break;
+        }
+      }
+
+      // Gravity anomaly also affects projectiles
+      if (hazard.type === 'gravity_anomaly') {
+        for (const proj of s.projectiles) {
+          if (!proj.active) continue;
+          const projDist = distance(proj.pos, hazard.pos);
+          if (projDist < hazard.radius && projDist > 0) {
+            const pushStrength = 150 * (1 - projDist / hazard.radius);
+            const pushDir = normalize(sub(proj.pos, hazard.pos));
+            proj.vel.x += pushDir.x * pushStrength * dt;
+            proj.vel.y += pushDir.y * pushStrength * dt;
+          }
+        }
+      }
+    }
+
+    // Clean up inactive hazards
+    s.hazards = s.hazards.filter(h => h.active);
   }
 
   // ── Level Up ──────────────────────────────────────────────────
@@ -1048,9 +1323,20 @@ export class GameEngine {
 
     const cam = s.camera;
 
+    // Draw hazards on the ground layer (before entities)
+    for (const hazard of s.hazards) {
+      if (hazard.active && r.isVisible(hazard.pos.x, hazard.pos.y, hazard.radius, cam))
+        r.drawHazard(hazard, s.time);
+    }
+
     for (const orb of s.xpOrbs) {
       if (orb.active && r.isVisible(orb.pos.x, orb.pos.y, orb.radius, cam))
         r.drawXPOrb(orb, s.time);
+    }
+
+    for (const loot of s.lootDrops) {
+      if (loot.active && r.isVisible(loot.pos.x, loot.pos.y, 30, cam))
+        r.drawLootDrop(loot, s.time);
     }
 
     for (const enemy of s.enemies) {

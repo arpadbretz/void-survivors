@@ -9,6 +9,8 @@ import {
   Projectile,
   Particle,
   XPOrb,
+  Hazard,
+  LootDrop,
   Camera,
   Ability,
   GameState,
@@ -461,11 +463,23 @@ export class Renderer {
         color = '#aa44ff';
         rot = Math.PI / 4; // rotated 45 degrees to make a diamond
         break;
-      case 'boss':
-        sides = 10;
-        color = '#ff0000';
-        rot = gameTime * 1.5;
+      case 'boss': {
+        const variant = enemy.bossVariant ?? 'titan';
+        if (variant === 'titan') {
+          sides = 8; // octagon
+          color = '#ff4444';
+          rot = gameTime * 0.5;
+        } else if (variant === 'harbinger') {
+          sides = 6; // hexagon
+          color = '#ff8800';
+          rot = gameTime * 1.0;
+        } else {
+          sides = 5; // pentagon
+          color = '#cc00ff';
+          rot = gameTime * 0.8;
+        }
         break;
+      }
       default:
         sides = 4;
         color = '#ff3344';
@@ -556,10 +570,56 @@ export class Renderer {
     }
 
     if (enemy.enemyType === 'boss') {
-      // Boss gets radial gradient glow (worth the cost for a boss)
+      const variant = enemy.bossVariant ?? 'titan';
+      // All bosses get radial glow
       this.drawGlow(ctx, x, y, enemy.radius * 3, color, 0.2);
-      this.drawStarShapeGlow(ctx, x, y, enemy.radius, color, 0.2, rot);
-      this.drawStarShape(ctx, x, y, enemy.radius, color, rot);
+
+      if (variant === 'titan') {
+        // Titan: large octagon with pulsing red glow
+        const pulse = 1 + Math.sin(gameTime * 3) * 0.1;
+        this.drawPolygonGlow(ctx, x, y, enemy.radius * pulse, 8, '#cc0000', 0.25, rot);
+        this.drawPolygon(ctx, x, y, enemy.radius * pulse, 8, color, rot);
+        // Inner core
+        this.drawPolygon(ctx, x, y, enemy.radius * 0.5, 8, '#ff8888', -rot);
+      } else if (variant === 'harbinger') {
+        // Harbinger: hexagon with orbiting energy orbs
+        this.drawPolygonGlow(ctx, x, y, enemy.radius, 6, '#cc6600', 0.25, rot);
+        this.drawPolygon(ctx, x, y, enemy.radius, 6, color, rot);
+        // Orbiting energy orbs
+        for (let i = 0; i < 4; i++) {
+          const orbAngle = gameTime * 2.5 + (i / 4) * Math.PI * 2;
+          const orbDist = enemy.radius * 1.6;
+          const orbX = x + Math.cos(orbAngle) * orbDist;
+          const orbY = y + Math.sin(orbAngle) * orbDist;
+          const orbPulse = 3 + Math.sin(gameTime * 5 + i) * 1;
+          ctx.fillStyle = '#ffaa44';
+          ctx.globalAlpha = 0.8;
+          ctx.beginPath();
+          ctx.arc(orbX, orbY, orbPulse, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.globalAlpha = 0.3;
+          ctx.beginPath();
+          ctx.arc(orbX, orbY, orbPulse * 2, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.globalAlpha = 1;
+        }
+      } else {
+        // Nexus: pentagon with rotating inner triangle
+        this.drawPolygonGlow(ctx, x, y, enemy.radius, 5, '#9900cc', 0.25, rot);
+        this.drawPolygon(ctx, x, y, enemy.radius, 5, color, rot);
+        // Inner rotating triangle
+        const innerRot = -gameTime * 3;
+        this.drawPolygon(ctx, x, y, enemy.radius * 0.45, 3, '#ee66ff', innerRot);
+        // Teleport warning flash (last 1 second before teleport)
+        const teleTimer = enemy.bossTeleportTimer ?? 0;
+        if (teleTimer > 7.0) {
+          const flashAlpha = Math.sin(gameTime * 20) * 0.3 + 0.3;
+          ctx.fillStyle = `rgba(204, 0, 255, ${flashAlpha})`;
+          ctx.beginPath();
+          ctx.arc(x, y, enemy.radius * 1.5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
     } else {
       // Elite enemies get a gold glow overlay
       if (enemy.isElite) {
@@ -805,6 +865,350 @@ export class Renderer {
     ctx.closePath();
     ctx.fill();
 
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  // ── Loot Drops ──────────────────────────────────────────────────
+
+  drawLootDrop(loot: LootDrop, gameTime: number): void {
+    const ctx = this.ctx;
+    const { x } = loot.pos;
+    // Bobbing animation (sine wave on Y)
+    const bob = Math.sin(gameTime * 3 + x * 0.1) * 5;
+    const y = loot.pos.y + bob;
+    const r = 14;
+
+    const elapsed = gameTime - loot.spawnTime;
+    const remaining = loot.lifetime - elapsed;
+
+    // Flash when about to expire (last 3 seconds)
+    if (remaining < 3) {
+      const flashRate = remaining < 1 ? 15 : 8;
+      if (Math.sin(gameTime * flashRate) < 0) return; // blink out
+    }
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+
+    // Pulsing glow ring
+    const glowPulse = 1 + Math.sin(gameTime * 4) * 0.3;
+    const glowColor = this.getLootGlowColor(loot.type);
+    ctx.strokeStyle = glowColor;
+    ctx.lineWidth = 2;
+    ctx.globalAlpha = 0.4;
+    ctx.beginPath();
+    ctx.arc(x, y, r * 1.8 * glowPulse, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.globalAlpha = 0.15;
+    ctx.fillStyle = glowColor;
+    ctx.beginPath();
+    ctx.arc(x, y, r * 2.2 * glowPulse, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.globalAlpha = 1;
+
+    switch (loot.type) {
+      case 'health':
+        // Green cross
+        this.drawLootCross(ctx, x, y, r, '#00ff44');
+        break;
+      case 'bomb':
+        // Red circle with spikes
+        this.drawLootBomb(ctx, x, y, r, '#ff2222', gameTime);
+        break;
+      case 'magnet':
+        // Blue diamond
+        this.drawLootDiamond(ctx, x, y, r, '#2288ff');
+        break;
+      case 'shield':
+        // Yellow hexagon
+        this.drawLootHexagon(ctx, x, y, r, '#ffdd00', gameTime);
+        break;
+    }
+
+    ctx.restore();
+  }
+
+  private getLootGlowColor(type: LootDrop['type']): string {
+    switch (type) {
+      case 'health': return '#00ff44';
+      case 'bomb': return '#ff2222';
+      case 'magnet': return '#2288ff';
+      case 'shield': return '#ffdd00';
+    }
+  }
+
+  private drawLootCross(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, color: string): void {
+    const w = r * 0.35;
+    const h = r * 0.85;
+    ctx.fillStyle = color;
+    // Vertical bar
+    ctx.fillRect(x - w, y - h, w * 2, h * 2);
+    // Horizontal bar
+    ctx.fillRect(x - h, y - w, h * 2, w * 2);
+    // White highlight
+    ctx.fillStyle = '#ffffff';
+    ctx.globalAlpha = 0.4;
+    ctx.fillRect(x - w * 0.5, y - h * 0.7, w, h * 1.4);
+    ctx.globalAlpha = 1;
+  }
+
+  private drawLootBomb(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, color: string, gameTime: number): void {
+    // Core circle
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(x, y, r * 0.6, 0, Math.PI * 2);
+    ctx.fill();
+    // Spikes
+    const spikeCount = 8;
+    for (let i = 0; i < spikeCount; i++) {
+      const a = (i / spikeCount) * Math.PI * 2 + gameTime * 2;
+      const innerR = r * 0.55;
+      const outerR = r * 0.9;
+      const sx = x + Math.cos(a) * innerR;
+      const sy = y + Math.sin(a) * innerR;
+      const ex = x + Math.cos(a) * outerR;
+      const ey = y + Math.sin(a) * outerR;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(ex, ey);
+      ctx.stroke();
+    }
+    // White core highlight
+    ctx.fillStyle = '#ffffff';
+    ctx.globalAlpha = 0.5;
+    ctx.beginPath();
+    ctx.arc(x - r * 0.15, y - r * 0.15, r * 0.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  private drawLootDiamond(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, color: string): void {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(x, y - r);
+    ctx.lineTo(x + r * 0.7, y);
+    ctx.lineTo(x, y + r);
+    ctx.lineTo(x - r * 0.7, y);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    // Inner diamond highlight
+    ctx.fillStyle = '#ffffff';
+    ctx.globalAlpha = 0.3;
+    ctx.beginPath();
+    ctx.moveTo(x, y - r * 0.5);
+    ctx.lineTo(x + r * 0.35, y);
+    ctx.lineTo(x, y + r * 0.5);
+    ctx.lineTo(x - r * 0.35, y);
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  private drawLootHexagon(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, color: string, gameTime: number): void {
+    const rot = gameTime * 0.5;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const a = rot + (i / 6) * Math.PI * 2 - Math.PI / 2;
+      const px = x + Math.cos(a) * r * 0.8;
+      const py = y + Math.sin(a) * r * 0.8;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    // Inner hexagon
+    ctx.fillStyle = '#ffffff';
+    ctx.globalAlpha = 0.3;
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const a = -rot + (i / 6) * Math.PI * 2 - Math.PI / 2;
+      const px = x + Math.cos(a) * r * 0.4;
+      const py = y + Math.sin(a) * r * 0.4;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  // ── Hazards ──────────────────────────────────────────────────
+
+  drawHazard(hazard: Hazard, gameTime: number): void {
+    const ctx = this.ctx;
+    const { x, y } = hazard.pos;
+    const age = gameTime - hazard.spawnTime;
+
+    // Warning indicator: flashing circle outline during first 1 second
+    if (age < 1.0) {
+      const flash = Math.sin(age * 15) * 0.5 + 0.5;
+      let warningColor: string;
+      switch (hazard.type) {
+        case 'void_rift': warningColor = '#6600cc'; break;
+        case 'plasma_pool': warningColor = '#00ff44'; break;
+        case 'gravity_anomaly': warningColor = '#4488ff'; break;
+      }
+      ctx.strokeStyle = warningColor;
+      ctx.lineWidth = 2;
+      ctx.globalAlpha = flash * 0.6;
+      ctx.beginPath();
+      ctx.arc(x, y, hazard.radius, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = flash * 0.3;
+      ctx.beginPath();
+      ctx.arc(x, y, hazard.radius * 0.5, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      return;
+    }
+
+    // Fade in during second 1-1.5, fade out during last 1 second
+    const fadeIn = Math.min(1, (age - 1.0) / 0.5);
+    const timeLeft = hazard.lifetime - age;
+    const fadeOut = Math.min(1, timeLeft / 1.0);
+    const alpha = fadeIn * fadeOut;
+
+    switch (hazard.type) {
+      case 'void_rift':
+        this.drawVoidRift(ctx, x, y, hazard.radius, gameTime, alpha, hazard.pulsePhase);
+        break;
+      case 'plasma_pool':
+        this.drawPlasmaPool(ctx, x, y, hazard.radius, gameTime, alpha, hazard.pulsePhase);
+        break;
+      case 'gravity_anomaly':
+        this.drawGravityAnomaly(ctx, x, y, hazard.radius, gameTime, alpha);
+        break;
+    }
+  }
+
+  private drawVoidRift(ctx: CanvasRenderingContext2D, x: number, y: number, radius: number, gameTime: number, alpha: number, phase: number): void {
+    const grad = ctx.createRadialGradient(x, y, 0, x, y, radius);
+    grad.addColorStop(0, `rgba(10, 0, 20, ${0.8 * alpha})`);
+    grad.addColorStop(0.6, `rgba(40, 0, 80, ${0.5 * alpha})`);
+    grad.addColorStop(1, `rgba(102, 0, 204, ${0.15 * alpha})`);
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Edge ring
+    ctx.strokeStyle = '#6600cc';
+    ctx.lineWidth = 2;
+    ctx.globalAlpha = 0.5 * alpha;
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Inner spiral arcs
+    ctx.globalAlpha = 0.4 * alpha;
+    ctx.strokeStyle = '#8800ff';
+    ctx.lineWidth = 1.5;
+    for (let i = 0; i < 3; i++) {
+      const startAngle = gameTime * 2 + phase + (i * Math.PI * 2 / 3);
+      ctx.beginPath();
+      ctx.arc(x, y, radius * (0.3 + i * 0.15), startAngle, startAngle + Math.PI * 0.8);
+      ctx.stroke();
+    }
+
+    // Rotating particle ring at edge
+    ctx.globalCompositeOperation = 'lighter';
+    const particleCount = 8;
+    for (let i = 0; i < particleCount; i++) {
+      const a = gameTime * 1.5 + phase + (i / particleCount) * Math.PI * 2;
+      const px = x + Math.cos(a) * radius * 0.85;
+      const py = y + Math.sin(a) * radius * 0.85;
+      ctx.fillStyle = '#9933ff';
+      ctx.globalAlpha = 0.6 * alpha;
+      ctx.beginPath();
+      ctx.arc(px, py, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  private drawPlasmaPool(ctx: CanvasRenderingContext2D, x: number, y: number, radius: number, gameTime: number, alpha: number, phase: number): void {
+    const grad = ctx.createRadialGradient(x, y, 0, x, y, radius);
+    grad.addColorStop(0, `rgba(100, 255, 100, ${0.5 * alpha})`);
+    grad.addColorStop(0.4, `rgba(0, 255, 68, ${0.35 * alpha})`);
+    grad.addColorStop(1, `rgba(0, 255, 68, ${0.0})`);
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Bright center glow
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = '#88ff88';
+    ctx.globalAlpha = 0.3 * alpha;
+    ctx.beginPath();
+    ctx.arc(x, y, radius * 0.2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Bubbling effect: small circles bobbing up and down
+    for (let i = 0; i < 6; i++) {
+      const bAngle = phase + (i / 6) * Math.PI * 2;
+      const bDist = radius * (0.3 + 0.3 * ((i % 3) / 3));
+      const bx = x + Math.cos(bAngle + gameTime * 0.5) * bDist;
+      const bobY = Math.sin(gameTime * 3 + i * 1.2) * 4;
+      const by = y + Math.sin(bAngle + gameTime * 0.5) * bDist + bobY;
+      const bSize = 2 + Math.sin(gameTime * 2 + i) * 1;
+
+      ctx.fillStyle = '#44ff88';
+      ctx.globalAlpha = (0.4 + Math.sin(gameTime * 2.5 + i * 0.8) * 0.2) * alpha;
+      ctx.beginPath();
+      ctx.arc(bx, by, Math.max(1, bSize), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  private drawGravityAnomaly(ctx: CanvasRenderingContext2D, x: number, y: number, radius: number, gameTime: number, alpha: number): void {
+    ctx.globalCompositeOperation = 'lighter';
+
+    // Concentric rings expanding outward
+    for (let i = 0; i < 4; i++) {
+      const ringPhase = (gameTime * 0.5 + i * 0.25) % 1.0;
+      const ringRadius = radius * ringPhase;
+      const ringAlpha = (1 - ringPhase) * 0.4 * alpha;
+      if (ringAlpha < 0.02) continue;
+
+      ctx.strokeStyle = '#4488ff';
+      ctx.lineWidth = 1.5;
+      ctx.globalAlpha = ringAlpha;
+      ctx.beginPath();
+      ctx.arc(x, y, ringRadius, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // Central bright dot
+    ctx.fillStyle = '#aaccff';
+    ctx.globalAlpha = (0.6 + Math.sin(gameTime * 4) * 0.2) * alpha;
+    ctx.beginPath();
+    ctx.arc(x, y, 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Outer boundary ring (faint)
+    ctx.strokeStyle = '#4488ff';
+    ctx.lineWidth = 1;
+    ctx.globalAlpha = 0.15 * alpha;
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
   }
 
@@ -1108,6 +1512,22 @@ export class Renderer {
       const ox = mx + orb.pos.x * scale;
       const oy = my + orb.pos.y * scale;
       ctx.fillRect(ox - 1, oy - 1, 2, 2);
+    }
+
+    // Hazards (colored circles on minimap)
+    for (const hazard of state.hazards) {
+      if (!hazard.active) continue;
+      const hx = mx + hazard.pos.x * scale;
+      const hy = my + hazard.pos.y * scale;
+      const hr = Math.max(2, hazard.radius * scale);
+      switch (hazard.type) {
+        case 'void_rift': ctx.fillStyle = 'rgba(102, 0, 204, 0.5)'; break;
+        case 'plasma_pool': ctx.fillStyle = 'rgba(0, 255, 68, 0.5)'; break;
+        case 'gravity_anomaly': ctx.fillStyle = 'rgba(68, 136, 255, 0.5)'; break;
+      }
+      ctx.beginPath();
+      ctx.arc(hx, hy, hr, 0, Math.PI * 2);
+      ctx.fill();
     }
 
     // Enemies (small red dots)

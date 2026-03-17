@@ -57,6 +57,14 @@ export function shouldSpawnBoss(wave: number): boolean {
   return wave % 5 === 0;
 }
 
+// ── Boss Variant Selection ──────────────────────────────────────
+
+function getBossVariant(wave: number): 'titan' | 'harbinger' | 'nexus' {
+  if (wave >= 15) return 'nexus';
+  if (wave >= 10) return 'harbinger';
+  return 'titan';
+}
+
 // ── Enemy Factory ───────────────────────────────────────────────
 
 export function createEnemy(
@@ -169,21 +177,57 @@ export function createEnemy(
         phaseState: 'visible' as const,
       };
 
-    case 'boss':
-      return {
-        ...base,
-        radius: 40,
-        health: Math.round((1000 + wave * 200) * scaleHP),
-        maxHealth: Math.round((1000 + wave * 200) * scaleHP),
-        speed: 30,
-        damage: Math.round(40 * scaleDmg),
-        xpValue: 200,
-        color: '#ff0000',
-        glowColor: '#ff0000',
-        enemyType: 'boss',
-        shootCooldown: 3.0,
-        lastShootTime: 0,
-      };
+    case 'boss': {
+      const variant = getBossVariant(wave);
+      switch (variant) {
+        case 'titan':
+          return {
+            ...base,
+            radius: 40,
+            health: Math.round(800 * scaleHP),
+            maxHealth: Math.round(800 * scaleHP),
+            speed: 40,
+            damage: Math.round(25 * scaleDmg),
+            xpValue: 200,
+            color: '#ff4444',
+            glowColor: '#cc0000',
+            enemyType: 'boss',
+            bossVariant: 'titan' as const,
+          };
+        case 'harbinger':
+          return {
+            ...base,
+            radius: 30,
+            health: Math.round(600 * scaleHP),
+            maxHealth: Math.round(600 * scaleHP),
+            speed: 70,
+            damage: Math.round(15 * scaleDmg),
+            xpValue: 250,
+            color: '#ff8800',
+            glowColor: '#cc6600',
+            enemyType: 'boss',
+            bossVariant: 'harbinger' as const,
+            bossSpawnTimer: 0,
+          };
+        case 'nexus':
+          return {
+            ...base,
+            radius: 35,
+            health: Math.round(1200 * scaleHP),
+            maxHealth: Math.round(1200 * scaleHP),
+            speed: 0,
+            damage: Math.round(15 * scaleDmg),
+            xpValue: 300,
+            color: '#cc00ff',
+            glowColor: '#9900cc',
+            enemyType: 'boss',
+            bossVariant: 'nexus' as const,
+            shootCooldown: 2.0,
+            lastShootTime: 0,
+            bossTeleportTimer: 0,
+          };
+      }
+    }
   }
 }
 
@@ -473,19 +517,75 @@ export function updateEnemies(
       }
 
       case 'boss': {
-        enemy.vel.x = dir.x * enemy.speed;
-        enemy.vel.y = dir.y * enemy.speed;
+        const variant = enemy.bossVariant ?? 'titan';
 
-        // Shoot ring of projectiles
-        if (
-          enemy.lastShootTime === undefined ||
-          gameTime - enemy.lastShootTime >= (enemy.shootCooldown ?? 3.0)
-        ) {
-          enemy.lastShootTime = gameTime;
-          const projCount = 12;
-          for (let i = 0; i < projCount; i++) {
-            const a = (i / projCount) * Math.PI * 2;
-            newProjectiles.push(createEnemyProjectile(enemy, a));
+        if (variant === 'titan') {
+          // Titan: slow, moves toward player, no shooting
+          enemy.vel.x = dir.x * enemy.speed;
+          enemy.vel.y = dir.y * enemy.speed;
+        } else if (variant === 'harbinger') {
+          // Harbinger: keeps distance (200-300px from player), spawns chasers
+          if (dist < 200) {
+            // Too close, retreat
+            enemy.vel.x = -dir.x * enemy.speed;
+            enemy.vel.y = -dir.y * enemy.speed;
+          } else if (dist > 300) {
+            // Too far, approach
+            enemy.vel.x = dir.x * enemy.speed;
+            enemy.vel.y = dir.y * enemy.speed;
+          } else {
+            // In sweet spot, strafe
+            const strafeAngle = angle(enemy.pos, player.pos) + Math.PI / 2;
+            enemy.vel.x = Math.cos(strafeAngle) * enemy.speed * 0.6;
+            enemy.vel.y = Math.sin(strafeAngle) * enemy.speed * 0.6;
+          }
+
+          // Spawn 2 chasers every 3 seconds
+          if (enemy.bossSpawnTimer === undefined) enemy.bossSpawnTimer = 0;
+          enemy.bossSpawnTimer += dt;
+          if (enemy.bossSpawnTimer >= 3.0) {
+            enemy.bossSpawnTimer -= 3.0;
+            for (let i = 0; i < 2; i++) {
+              const spawnAngle = Math.random() * Math.PI * 2;
+              const spawnDist = enemy.radius + 20;
+              const spawnPos = {
+                x: enemy.pos.x + Math.cos(spawnAngle) * spawnDist,
+                y: enemy.pos.y + Math.sin(spawnAngle) * spawnDist,
+              };
+              // Push spawned chasers into newProjectiles using a marker (handled by engine)
+              // We can't directly push enemies here, so we store them on the enemy
+              if (!enemy._spawnedEnemies) enemy._spawnedEnemies = [];
+              enemy._spawnedEnemies.push(spawnPos);
+            }
+          }
+        } else if (variant === 'nexus') {
+          // Nexus: stationary, fires rings of projectiles, teleports
+          enemy.vel.x = 0;
+          enemy.vel.y = 0;
+
+          // Fire ring of 12 projectiles every 2 seconds
+          if (
+            enemy.lastShootTime === undefined ||
+            gameTime - enemy.lastShootTime >= (enemy.shootCooldown ?? 2.0)
+          ) {
+            enemy.lastShootTime = gameTime;
+            const projCount = 12;
+            for (let i = 0; i < projCount; i++) {
+              const a = (i / projCount) * Math.PI * 2;
+              newProjectiles.push(createEnemyProjectile(enemy, a));
+            }
+          }
+
+          // Teleport every 8 seconds
+          if (enemy.bossTeleportTimer === undefined) enemy.bossTeleportTimer = 0;
+          enemy.bossTeleportTimer += dt;
+          if (enemy.bossTeleportTimer >= 8.0) {
+            enemy.bossTeleportTimer -= 8.0;
+            // Teleport to a random position around the player (200-400px away)
+            const teleAngle = Math.random() * Math.PI * 2;
+            const teleDist = 200 + Math.random() * 200;
+            enemy.pos.x = player.pos.x + Math.cos(teleAngle) * teleDist;
+            enemy.pos.y = player.pos.y + Math.sin(teleAngle) * teleDist;
           }
         }
         break;
