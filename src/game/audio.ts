@@ -252,6 +252,46 @@ export class AudioManager {
     sub.stop(t + 1.5);
   }
 
+  playAchievement(): void {
+    this.ensureContext();
+    if (!this.ctx || !this.masterGain || this.muted) return;
+
+    const t = this.ctx.currentTime;
+    // Triumphant fanfare: ascending arpeggio with shimmer
+    const notes = [659, 784, 988, 1319]; // E5, G5, B5, E6
+
+    notes.forEach((freq, i) => {
+      const osc = this.ctx!.createOscillator();
+      const gain = this.ctx!.createGain();
+      const start = t + i * 0.08;
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, start);
+
+      gain.gain.setValueAtTime(0, start);
+      gain.gain.linearRampToValueAtTime(0.18, start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.4);
+
+      osc.connect(gain);
+      gain.connect(this.masterGain!);
+      osc.start(start);
+      osc.stop(start + 0.4);
+    });
+
+    // Shimmer overlay
+    const shimmer = this.ctx.createOscillator();
+    const shimmerGain = this.ctx.createGain();
+    shimmer.type = 'sine';
+    shimmer.frequency.setValueAtTime(2637, t + 0.24); // E7
+    shimmerGain.gain.setValueAtTime(0, t + 0.24);
+    shimmerGain.gain.linearRampToValueAtTime(0.08, t + 0.28);
+    shimmerGain.gain.exponentialRampToValueAtTime(0.001, t + 0.8);
+    shimmer.connect(shimmerGain);
+    shimmerGain.connect(this.masterGain);
+    shimmer.start(t + 0.24);
+    shimmer.stop(t + 0.8);
+  }
+
   playGameOver(): void {
     this.ensureContext();
     if (!this.ctx || !this.masterGain || this.muted) return;

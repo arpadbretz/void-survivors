@@ -29,6 +29,15 @@ interface GameOverStats {
   enemiesKilled: number;
   wavesSurvived: number;
   maxCombo: number;
+  bossesKilled: number;
+}
+
+interface AchievementToast {
+  id: string;
+  name: string;
+  icon: string;
+  tier: string;
+  expiresAt: number;
 }
 
 type GameScreen = "menu" | "playing" | "paused" | "upgrade" | "gameover";
@@ -99,6 +108,14 @@ interface EngineCallbacks {
   onStateChange: (state: HUDState) => void;
   onLevelUp: (choices: UpgradeChoice[]) => void;
   onGameOver: (stats: GameOverStats) => void;
+  onAchievementCheck?: (stats: {
+    score: number;
+    kills: number;
+    wave: number;
+    level: number;
+    combo: number;
+    timeSurvived: number;
+  }) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -143,6 +160,13 @@ export default function PlayPage() {
   const [newHighScoreRank, setNewHighScoreRank] = useState<number | null>(null);
   const [personalBest, setPersonalBest] = useState<number | null>(null);
 
+  // Achievement & stats state
+  const achievementManagerRef = useRef<import("@/game/achievements").AchievementManager | null>(null);
+  const [achievementToasts, setAchievementToasts] = useState<AchievementToast[]>([]);
+  const [lifetimeStats, setLifetimeStats] = useState<import("@/game/stats").LifetimeStats | null>(null);
+  const [achievementCount, setAchievementCount] = useState({ unlocked: 0, total: 0 });
+  const audioRef = useRef<import("@/game/audio").AudioManager | null>(null);
+
   // Joystick state
   const joystickRef = useRef<HTMLDivElement>(null);
   const [joystickActive, setJoystickActive] = useState(false);
@@ -150,7 +174,7 @@ export default function PlayPage() {
   const joystickCenter = useRef({ x: 0, y: 0 });
 
   // -----------------------------------------------------------------------
-  // Load high scores on mount
+  // Load high scores, achievements, and stats on mount
   // -----------------------------------------------------------------------
   useEffect(() => {
     const scores = loadHighScores();
@@ -158,6 +182,22 @@ export default function PlayPage() {
     if (scores.length > 0) {
       setPersonalBest(scores[0].score);
     }
+
+    // Load achievement manager and lifetime stats
+    Promise.all([
+      import("@/game/achievements"),
+      import("@/game/stats"),
+      import("@/game/audio"),
+    ]).then(([achMod, statsMod, audioMod]) => {
+      const mgr = new achMod.AchievementManager();
+      achievementManagerRef.current = mgr;
+      setAchievementCount({ unlocked: mgr.getUnlockedCount(), total: mgr.getTotalCount() });
+
+      const stats = statsMod.loadLifetimeStats();
+      setLifetimeStats(stats);
+
+      audioRef.current = audioMod.AudioManager.getInstance();
+    });
   }, []);
 
   // -----------------------------------------------------------------------
@@ -202,7 +242,7 @@ export default function PlayPage() {
     setScreen("upgrade");
   }, []);
 
-  const handleGameOver = useCallback((stats: GameOverStats) => {
+  const handleGameOver = useCallback(async (stats: GameOverStats) => {
     setGameOverStats(stats);
     const entry: HighScoreEntry = {
       score: stats.score,
@@ -217,8 +257,118 @@ export default function PlayPage() {
     if (scores.length > 0) {
       setPersonalBest(scores[0].score);
     }
+
+    // Update lifetime stats
+    try {
+      const statsMod = await import("@/game/stats");
+      const current = statsMod.loadLifetimeStats();
+      const updated = statsMod.updateLifetimeStats(current, {
+        kills: stats.enemiesKilled,
+        timeSurvived: stats.timeSurvived,
+        score: stats.score,
+        wave: stats.wavesSurvived,
+        level: stats.level,
+        maxCombo: stats.maxCombo,
+        bossesKilled: stats.bossesKilled,
+      });
+      statsMod.saveLifetimeStats(updated);
+      setLifetimeStats(updated);
+
+      // Check achievements
+      if (achievementManagerRef.current) {
+        const mgr = achievementManagerRef.current;
+        mgr.check({
+          score: stats.score,
+          kills: stats.enemiesKilled,
+          wave: stats.wavesSurvived,
+          level: stats.level,
+          combo: stats.maxCombo,
+          timeSurvived: stats.timeSurvived,
+          gamesPlayed: updated.gamesPlayed,
+          totalKills: updated.totalKills,
+          totalPlaytime: updated.totalPlaytime,
+          bossesKilled: updated.bossesKilled,
+        });
+        setAchievementCount({ unlocked: mgr.getUnlockedCount(), total: mgr.getTotalCount() });
+
+        // Show achievement toasts
+        let notification = mgr.popNotification();
+        const toasts: AchievementToast[] = [];
+        while (notification) {
+          toasts.push({
+            id: notification.id,
+            name: notification.name,
+            icon: notification.icon,
+            tier: notification.tier,
+            expiresAt: Date.now() + 4000 + toasts.length * 1000,
+          });
+          notification = mgr.popNotification();
+        }
+        if (toasts.length > 0) {
+          setAchievementToasts((prev) => [...prev, ...toasts]);
+          audioRef.current?.playAchievement();
+          // Auto-remove toasts
+          toasts.forEach((t) => {
+            setTimeout(() => {
+              setAchievementToasts((prev) => prev.filter((x) => x.id !== t.id));
+            }, t.expiresAt - Date.now());
+          });
+        }
+      }
+    } catch {
+      // ignore
+    }
+
     setScreen("gameover");
   }, []);
+
+  // -----------------------------------------------------------------------
+  // Real-time achievement check (during gameplay)
+  // -----------------------------------------------------------------------
+  const handleAchievementCheck = useCallback((stats: {
+    score: number;
+    kills: number;
+    wave: number;
+    level: number;
+    combo: number;
+    timeSurvived: number;
+  }) => {
+    const mgr = achievementManagerRef.current;
+    if (!mgr) return;
+
+    const lt = lifetimeStats || { gamesPlayed: 0, totalKills: 0, totalPlaytime: 0, bossesKilled: 0 };
+
+    mgr.check({
+      ...stats,
+      gamesPlayed: lt.gamesPlayed,
+      totalKills: lt.totalKills + stats.kills,
+      totalPlaytime: lt.totalPlaytime + stats.timeSurvived,
+      bossesKilled: lt.bossesKilled,
+    });
+
+    let notification = mgr.popNotification();
+    const toasts: AchievementToast[] = [];
+    while (notification) {
+      toasts.push({
+        id: notification.id,
+        name: notification.name,
+        icon: notification.icon,
+        tier: notification.tier,
+        expiresAt: Date.now() + 4000 + toasts.length * 1000,
+      });
+      notification = mgr.popNotification();
+    }
+    if (toasts.length > 0) {
+      setAchievementToasts((prev) => [...prev, ...toasts]);
+      setAchievementCount({ unlocked: mgr.getUnlockedCount(), total: mgr.getTotalCount() });
+      audioRef.current?.playAchievement();
+      toasts.forEach((t) => {
+        setTimeout(() => {
+          setAchievementToasts((prev) => prev.filter((x) => x.id !== t.id));
+        }, t.expiresAt - Date.now());
+      });
+    }
+  }, [lifetimeStats]);
 
   // -----------------------------------------------------------------------
   // Load engine dynamically (only on client)
@@ -254,10 +404,11 @@ export default function PlayPage() {
       onStateChange: handleStateChange,
       onLevelUp: handleLevelUp,
       onGameOver: handleGameOver,
+      onAchievementCheck: handleAchievementCheck,
     });
     engineRef.current.setSoundEnabled(soundEnabled);
     setScreen("playing");
-  }, [handleStateChange, handleLevelUp, handleGameOver, soundEnabled]);
+  }, [handleStateChange, handleLevelUp, handleGameOver, handleAchievementCheck, soundEnabled]);
 
   // -----------------------------------------------------------------------
   // Select upgrade
@@ -280,9 +431,10 @@ export default function PlayPage() {
       onStateChange: handleStateChange,
       onLevelUp: handleLevelUp,
       onGameOver: handleGameOver,
+      onAchievementCheck: handleAchievementCheck,
     });
     setScreen("playing");
-  }, [handleStateChange, handleLevelUp, handleGameOver]);
+  }, [handleStateChange, handleLevelUp, handleGameOver, handleAchievementCheck]);
 
   const resumeGame = useCallback(() => {
     engineRef.current?.resume();
@@ -463,10 +615,43 @@ export default function PlayPage() {
               </p>
             )}
 
+            {/* Lifetime Stats Summary */}
+            {lifetimeStats && lifetimeStats.gamesPlayed > 0 && (
+              <div
+                style={{
+                  marginTop: 16,
+                  display: "flex",
+                  gap: 20,
+                  justifyContent: "center",
+                  fontSize: "0.75rem",
+                  color: "rgba(224,224,240,0.35)",
+                  fontFamily: "var(--font-geist-mono), monospace",
+                  letterSpacing: "0.05em",
+                }}
+              >
+                <span>{lifetimeStats.gamesPlayed} games</span>
+                <span>{lifetimeStats.totalKills.toLocaleString()} kills</span>
+                <span>{Math.floor(lifetimeStats.totalPlaytime / 60)}m played</span>
+              </div>
+            )}
+
+            {achievementCount.total > 0 && (
+              <p
+                style={{
+                  color: "rgba(224,224,240,0.3)",
+                  fontSize: "0.8rem",
+                  marginTop: 8,
+                  letterSpacing: "0.08em",
+                }}
+              >
+                Achievements: {achievementCount.unlocked} / {achievementCount.total}
+              </p>
+            )}
+
             <button
               onClick={toggleSound}
               style={{
-                marginTop: 20,
+                marginTop: 16,
                 background: "none",
                 border: "1px solid rgba(255,255,255,0.15)",
                 borderRadius: 8,
@@ -1218,11 +1403,25 @@ export default function PlayPage() {
               </div>
             )}
 
+            {/* Achievement Progress */}
+            {achievementCount.total > 0 && (
+              <div
+                style={{
+                  marginTop: 20,
+                  fontSize: "0.8rem",
+                  color: "rgba(224,224,240,0.4)",
+                  letterSpacing: "0.1em",
+                }}
+              >
+                Achievements: {achievementCount.unlocked} / {achievementCount.total}
+              </div>
+            )}
+
             <div
               style={{
                 display: "flex",
                 gap: 16,
-                marginTop: 36,
+                marginTop: 24,
                 justifyContent: "center",
                 flexWrap: "wrap",
               }}
@@ -1235,6 +1434,72 @@ export default function PlayPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ============== Achievement Toast Notifications ============== */}
+      {achievementToasts.length > 0 && (
+        <div
+          style={{
+            position: "absolute",
+            top: 20,
+            right: 20,
+            zIndex: 50,
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
+            pointerEvents: "none",
+          }}
+        >
+          {achievementToasts.map((toast) => {
+            const tierColor =
+              toast.tier === "platinum" ? "#e5e4e2" :
+              toast.tier === "gold" ? "#ffd700" :
+              toast.tier === "silver" ? "#c0c0c0" : "#cd7f32";
+            return (
+              <div
+                key={toast.id}
+                className="animate-slide-up"
+                style={{
+                  background: "rgba(10, 10, 20, 0.9)",
+                  border: `1px solid ${tierColor}`,
+                  borderRadius: 10,
+                  padding: "12px 20px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  backdropFilter: "blur(8px)",
+                  boxShadow: `0 0 15px ${tierColor}40, 0 0 30px ${tierColor}20`,
+                  minWidth: 220,
+                }}
+              >
+                <span style={{ fontSize: "1.8rem" }}>{toast.icon}</span>
+                <div>
+                  <div
+                    style={{
+                      fontSize: "0.65rem",
+                      fontWeight: 800,
+                      letterSpacing: "0.15em",
+                      color: tierColor,
+                      textTransform: "uppercase",
+                      marginBottom: 2,
+                    }}
+                  >
+                    Achievement Unlocked
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "0.9rem",
+                      fontWeight: 700,
+                      color: "#ffffff",
+                    }}
+                  >
+                    {toast.name}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

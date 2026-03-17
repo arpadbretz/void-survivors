@@ -34,9 +34,9 @@ function genId(): string {
 const WAVE_CONFIGS: WaveConfig[] = [
   { enemyTypes: ['chaser'], spawnRate: 2.5, maxEnemies: 8, duration: 30 },
   { enemyTypes: ['chaser', 'swarm'], spawnRate: 2.0, maxEnemies: 15, duration: 30 },
-  { enemyTypes: ['chaser', 'swarm', 'shooter'], spawnRate: 1.5, maxEnemies: 22, duration: 30 },
-  { enemyTypes: ['chaser', 'shooter', 'tank'], spawnRate: 1.2, maxEnemies: 30, duration: 30 },
-  { enemyTypes: ['chaser', 'swarm', 'shooter', 'tank'], spawnRate: 1.0, maxEnemies: 40, duration: 30 },
+  { enemyTypes: ['chaser', 'swarm', 'shooter', 'splitter'], spawnRate: 1.5, maxEnemies: 22, duration: 30 },
+  { enemyTypes: ['chaser', 'shooter', 'tank', 'splitter'], spawnRate: 1.2, maxEnemies: 30, duration: 30 },
+  { enemyTypes: ['chaser', 'swarm', 'shooter', 'tank', 'splitter'], spawnRate: 1.0, maxEnemies: 40, duration: 30 },
 ];
 
 export function getWaveConfig(wave: number): WaveConfig {
@@ -138,6 +138,20 @@ export function createEnemy(
         enemyType: 'tank',
       };
 
+    case 'splitter':
+      return {
+        ...base,
+        radius: 18,
+        health: Math.round(60 * scaleHP),
+        maxHealth: Math.round(60 * scaleHP),
+        speed: 80,
+        damage: Math.round(12 * scaleDmg),
+        xpValue: 25,
+        color: '#22dd88',
+        glowColor: '#00cc66',
+        enemyType: 'splitter',
+      };
+
     case 'boss':
       return {
         ...base,
@@ -154,6 +168,37 @@ export function createEnemy(
         lastShootTime: 0,
       };
   }
+}
+
+export function createSplitEnemies(pos: Vector2, wave: number): Enemy[] {
+  const results: Enemy[] = [];
+  for (let i = 0; i < 2; i++) {
+    const offset = { x: (Math.random() - 0.5) * 30, y: (Math.random() - 0.5) * 30 };
+    const splitPos = { x: pos.x + offset.x, y: pos.y + offset.y };
+    const scaleHP = 1 + (wave - 1) * 0.1;
+    const scaleDmg = 1 + (wave - 1) * 0.1;
+    results.push({
+      id: genId(),
+      pos: splitPos,
+      vel: vec2((Math.random() - 0.5) * 100, (Math.random() - 0.5) * 100),
+      radius: 10,
+      health: Math.round(20 * scaleHP),
+      maxHealth: Math.round(20 * scaleHP),
+      speed: 140,
+      damage: Math.round(6 * scaleDmg),
+      xpValue: 8,
+      color: '#22dd88',
+      glowColor: '#00cc66',
+      enemyType: 'swarm', // mini splitters behave like swarm
+      active: true,
+      type: 'enemy',
+      rotation: 0,
+      phaseOffset: Math.random() * Math.PI * 2,
+      shootCooldown: 0,
+      lastShootTime: 0,
+    });
+  }
+  return results;
 }
 
 // ── Spawning ────────────────────────────────────────────────────
@@ -292,6 +337,14 @@ export function updateEnemies(
         enemy.vel.x = dir.x * enemy.speed;
         enemy.vel.y = dir.y * enemy.speed;
         break;
+
+      case 'splitter': {
+        // Approach player with slight orbiting
+        const orbitAngle = angle(enemy.pos, player.pos) + Math.sin(gameTime * 2 + (enemy.phaseOffset ?? 0)) * 0.4;
+        enemy.vel.x = Math.cos(orbitAngle) * enemy.speed;
+        enemy.vel.y = Math.sin(orbitAngle) * enemy.speed;
+        break;
+      }
 
       case 'boss': {
         enemy.vel.x = dir.x * enemy.speed;

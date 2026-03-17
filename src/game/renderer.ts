@@ -182,6 +182,11 @@ export class Renderer {
         color = '#aa44ff';
         rot = gameTime * 0.3;
         break;
+      case 'splitter':
+        sides = 7;  // heptagon - unique shape
+        color = '#22dd88';
+        rot = gameTime * 2;
+        break;
       case 'boss':
         sides = 10;
         color = '#ff0000';

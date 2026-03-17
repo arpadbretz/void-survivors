@@ -26,6 +26,7 @@ import {
   EnemyManager,
   updateEnemies,
   shouldSpawnBoss,
+  createSplitEnemies,
 } from './enemies';
 import {
   getRandomUpgradeChoices,
@@ -80,6 +81,15 @@ interface EngineCallbacks {
     enemiesKilled: number;
     wavesSurvived: number;
     maxCombo: number;
+    bossesKilled: number;
+  }) => void;
+  onAchievementCheck?: (stats: {
+    score: number;
+    kills: number;
+    wave: number;
+    level: number;
+    combo: number;
+    timeSurvived: number;
   }) => void;
 }
 
@@ -101,7 +111,9 @@ export class GameEngine {
   private soundEnabled: boolean = true;
 
   private enemiesKilled: number = 0;
+  private bossesKilled: number = 0;
   private lastHudUpdate: number = 0;
+  private lastAchievementCheck: number = 0;
 
   // Combo / kill streak tracking
   private comboCount: number = 0;
@@ -283,7 +295,9 @@ export class GameEngine {
     };
 
     this.enemiesKilled = 0;
+    this.bossesKilled = 0;
     this.lastHudUpdate = 0;
+    this.lastAchievementCheck = 0;
     this.comboCount = 0;
     this.comboTimer = 0;
     this.maxCombo = 0;
@@ -473,6 +487,21 @@ export class GameEngine {
     if (s.time - this.lastHudUpdate >= HUD_UPDATE_INTERVAL) {
       this.lastHudUpdate = s.time;
       this.pushHudState();
+    }
+
+    // 17. Achievement check (every 2 seconds)
+    if (s.time - this.lastAchievementCheck >= 2.0) {
+      this.lastAchievementCheck = s.time;
+      if (this.callbacks?.onAchievementCheck) {
+        this.callbacks.onAchievementCheck({
+          score: s.score,
+          kills: this.enemiesKilled,
+          wave: s.wave,
+          level: s.player.level,
+          combo: this.maxCombo,
+          timeSurvived: s.time,
+        });
+      }
     }
   }
 
@@ -680,6 +709,13 @@ export class GameEngine {
 
   private killEnemy(enemy: Enemy): void {
     enemy.active = false;
+
+    // Splitter: spawn mini enemies on death
+    if (enemy.enemyType === 'splitter') {
+      const splits = createSplitEnemies(enemy.pos, this.state.wave);
+      this.state.enemies.push(...splits);
+    }
+
     this.enemiesKilled++;
 
     // Combo tracking
@@ -714,6 +750,7 @@ export class GameEngine {
     this.audio.playExplosion();
 
     if (enemy.enemyType === 'boss') {
+      this.bossesKilled++;
       this.particles.emitExplosion(
         enemy.pos.x,
         enemy.pos.y,
@@ -913,6 +950,7 @@ export class GameEngine {
         enemiesKilled: this.enemiesKilled,
         wavesSurvived: this.state.wave,
         maxCombo: this.maxCombo,
+        bossesKilled: this.bossesKilled,
       });
     }
   }

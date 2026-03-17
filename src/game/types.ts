@@ -30,7 +30,7 @@ export interface Player extends Entity {
   lastDamageTime: number;
 }
 
-export type EnemyType = 'chaser' | 'shooter' | 'swarm' | 'tank' | 'boss';
+export type EnemyType = 'chaser' | 'shooter' | 'swarm' | 'tank' | 'splitter' | 'boss';
 
 export interface Enemy extends Entity {
   speed: number;

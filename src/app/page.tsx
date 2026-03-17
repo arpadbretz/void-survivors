@@ -383,8 +383,13 @@ export default function HomePage() {
           />
           <FeatureCard
             icon={"⚡"}
-            title="8 Unique Abilities"
+            title="9 Unique Abilities"
             description="Chain Lightning, Orbit Shield, Missile Swarm and more. Mix and match to create devastating builds."
+          />
+          <FeatureCard
+            icon={"🏆"}
+            title="25 Achievements"
+            description="Track your progress with milestones for kills, waves, combos, and more. How many can you unlock?"
           />
           <FeatureCard
             icon={"🌐"}
