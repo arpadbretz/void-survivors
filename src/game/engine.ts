@@ -431,6 +431,7 @@ export class GameEngine {
       WORLD_SIZE,
       s.enemies
     );
+    for (const e of newEnemies) e.spawnTime = s.time;
     s.enemies.push(...newEnemies);
 
     // Check for boss spawn on milestone waves
@@ -445,13 +446,14 @@ export class GameEngine {
         s.enemies
       );
       if (bossEnemies.length > 0) {
+        for (const e of bossEnemies) e.spawnTime = s.time;
         s.enemies.push(...bossEnemies);
         this.audio.playBossSpawn();
       }
     }
 
     // 4. Enemy AI
-    const enemyProj = updateEnemies(s.enemies, s.player, dt, s.time);
+    const enemyProj = updateEnemies(s.enemies, s.player, dt, s.time, this.enemyManager.waveSpeedMultiplier);
     s.projectiles.push(...enemyProj);
 
     // 5. Update projectiles
@@ -767,10 +769,12 @@ export class GameEngine {
     // Splitter: spawn mini enemies on death
     if (enemy.enemyType === 'splitter') {
       const splits = createSplitEnemies(enemy.pos, this.state.wave);
+      for (const e of splits) e.spawnTime = this.state.time;
       this.state.enemies.push(...splits);
     }
 
     this.enemiesKilled++;
+    this.renderer?.flashKillCount(1);
 
     // Combo tracking
     this.comboCount++;
@@ -879,12 +883,43 @@ export class GameEngine {
 
   // ── Wave Progression ──────────────────────────────────────────
 
+  private getWaveEventName(wave: number): string | undefined {
+    // Swarm Rush: waves 3, 7, 11, ... (every 4 starting at 3)
+    if (wave >= 3 && (wave - 3) % 4 === 0) return 'SWARM RUSH';
+    // Tank Parade: waves 4, 8, 12, ... (every 4 starting at 4)
+    if (wave >= 4 && (wave - 4) % 4 === 0) return 'TANK PARADE';
+    // Speed Frenzy: waves 6, 10, 14, ... (every 4 starting at 6)
+    if (wave >= 6 && (wave - 6) % 4 === 0) return 'SPEED FRENZY';
+    return undefined;
+  }
+
   private checkWaveProgression(): void {
     const expectedWave = Math.floor(this.state.time / WAVE_DURATION) + 1;
     if (expectedWave > this.state.wave) {
       this.state.wave = expectedWave;
-      this.renderer?.announceWave(expectedWave);
+
+      // Reset speed multiplier each wave
+      this.enemyManager.setWaveSpeedMultiplier(1);
+
+      // Determine wave event
+      const eventName = this.getWaveEventName(expectedWave);
+      this.renderer?.announceWave(expectedWave, eventName);
       this.audio.setMusicIntensity(this.state.wave / 10);
+
+      // Apply wave events
+      if (eventName === 'SWARM RUSH') {
+        this.enemyManager.activateSwarmRush();
+      } else if (eventName === 'TANK PARADE') {
+        const tanks = this.enemyManager.spawnTankParade(
+          expectedWave,
+          this.state.player.pos,
+          WORLD_SIZE
+        );
+        for (const e of tanks) e.spawnTime = this.state.time;
+        this.state.enemies.push(...tanks);
+      } else if (eventName === 'SPEED FRENZY') {
+        this.enemyManager.setWaveSpeedMultiplier(1.5);
+      }
 
       // Tutorial: combo hint when wave 2 starts
       if (expectedWave === 2 && !this.tutorialTriggered.has('combo')) {

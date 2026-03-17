@@ -32,10 +32,14 @@ export class Renderer {
   private waveAnnounceTime: number = 0; // timestamp when announcement started
   private waveAnnounceDuration: number = 3; // seconds
   private waveAnnounceActive: boolean = false;
+  private waveAnnounceSubtitle: string | undefined = undefined;
 
   // Tutorial hint system
   private tutorialHints: { text: string; time: number; duration: number }[] = [];
   private tutorialShown: Set<string> = new Set();
+
+  // Kill counter flash state
+  private killFlashEntries: { count: number; time: number }[] = [];
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -213,7 +217,40 @@ export class Renderer {
         rot = 0;
     }
 
+    // Elite enemies use gold colors
+    if (enemy.isElite) {
+      color = '#ffd700';
+    }
+
+    // Spawn materialize animation (first 0.3s)
+    const spawnElapsed = (enemy.spawnTime !== undefined && enemy.spawnTime > 0)
+      ? gameTime - enemy.spawnTime
+      : 1; // treat as fully spawned if no spawnTime
+    const isSpawning = spawnElapsed < 0.3;
+    const spawnT = isSpawning ? spawnElapsed / 0.3 : 1; // 0..1
+
+    if (isSpawning) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.scale(spawnT, spawnT);
+      ctx.translate(-x, -y);
+      ctx.globalAlpha = spawnT;
+    }
+
     ctx.globalCompositeOperation = 'lighter';
+
+    // Spawn glow ring that expands and fades
+    if (isSpawning) {
+      const ringRadius = enemy.radius * (1 + (1 - spawnT) * 2);
+      const ringAlpha = (1 - spawnT) * 0.5;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.globalAlpha = ringAlpha * spawnT;
+      ctx.beginPath();
+      ctx.arc(x, y, ringRadius, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = spawnT;
+    }
 
     if (enemy.enemyType === 'boss') {
       // Boss gets radial gradient glow (worth the cost for a boss)
@@ -221,12 +258,41 @@ export class Renderer {
       this.drawStarShapeGlow(ctx, x, y, enemy.radius, color, 0.2, rot);
       this.drawStarShape(ctx, x, y, enemy.radius, color, rot);
     } else {
+      // Elite enemies get a gold glow overlay
+      if (enemy.isElite) {
+        this.drawGlow(ctx, x, y, enemy.radius * 2.5, '#ffaa00', 0.2);
+      }
       // Regular enemies: larger semi-transparent shape behind = glow
       this.drawPolygonGlow(ctx, x, y, enemy.radius, sides, color, 0.15, rot);
       this.drawPolygon(ctx, x, y, enemy.radius, sides, color, rot);
     }
 
     ctx.globalCompositeOperation = 'source-over';
+
+    if (isSpawning) {
+      ctx.restore();
+    }
+
+    // Elite crown indicator (3-triangle crown shape above enemy)
+    if (enemy.isElite) {
+      const crownY = y - enemy.radius - 12;
+      const crownW = enemy.radius * 0.8;
+      const crownH = 8;
+      ctx.fillStyle = '#ffd700';
+      ctx.beginPath();
+      // Left triangle
+      ctx.moveTo(x - crownW, crownY);
+      ctx.lineTo(x - crownW * 0.6, crownY - crownH);
+      ctx.lineTo(x - crownW * 0.2, crownY);
+      // Center triangle
+      ctx.lineTo(x, crownY - crownH * 1.2);
+      ctx.lineTo(x + crownW * 0.2, crownY);
+      // Right triangle
+      ctx.lineTo(x + crownW * 0.6, crownY - crownH);
+      ctx.lineTo(x + crownW, crownY);
+      ctx.closePath();
+      ctx.fill();
+    }
 
     // Low health warning flash
     if (enemy.health < enemy.maxHealth * 0.2 && enemy.health > 0) {
@@ -254,11 +320,29 @@ export class Renderer {
 
   // ── Projectiles ───────────────────────────────────────────────
 
-  drawProjectile(proj: Projectile): void {
+  drawProjectile(proj: Projectile, dt: number = 0.016): void {
     const ctx = this.ctx;
     const { x, y } = proj.pos;
 
     ctx.globalCompositeOperation = 'lighter';
+
+    // Fading trail copies for player projectiles
+    if (proj.owner === 'player') {
+      const trailAlphas = [0.4, 0.2, 0.1];
+      const trailScales = [0.85, 0.7, 0.55];
+      for (let i = 1; i <= 3; i++) {
+        const prevX = x - proj.vel.x * dt * i;
+        const prevY = y - proj.vel.y * dt * i;
+        const trailR = proj.radius * trailScales[i - 1];
+
+        ctx.fillStyle = proj.color;
+        ctx.globalAlpha = trailAlphas[i - 1];
+        ctx.beginPath();
+        ctx.arc(prevX, prevY, trailR, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
 
     // Trail line (no shadowBlur)
     const trailLen = 8;
@@ -398,10 +482,43 @@ export class Renderer {
 
   // ── HUD ───────────────────────────────────────────────────────
 
-  announceWave(wave: number): void {
+  // ── Kill Counter Flash ──────────────────────────────────────
+
+  flashKillCount(count: number): void {
+    this.killFlashEntries.push({ count, time: performance.now() / 1000 });
+  }
+
+  private drawKillFlash(): void {
+    const now = performance.now() / 1000;
+    const DURATION = 0.5;
+    this.killFlashEntries = this.killFlashEntries.filter(e => now - e.time < DURATION);
+
+    const ctx = this.ctx;
+    for (const entry of this.killFlashEntries) {
+      const elapsed = now - entry.time;
+      const t = elapsed / DURATION; // 0..1
+      const alpha = 1 - t;
+      const offsetY = t * 40; // floats upward 40px
+
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.textAlign = 'center';
+      ctx.font = 'bold 22px monospace';
+      ctx.fillStyle = '#ff3344';
+      ctx.fillText(
+        `+${entry.count}`,
+        this.width / 2,
+        this.height - 85 - offsetY
+      );
+      ctx.restore();
+    }
+  }
+
+  announceWave(wave: number, subtitle?: string): void {
     this.waveAnnounceWave = wave;
     this.waveAnnounceTime = performance.now() / 1000;
     this.waveAnnounceActive = true;
+    this.waveAnnounceSubtitle = subtitle;
   }
 
   drawHUD(state: GameState, worldSize: number = 4000): void {
@@ -530,18 +647,22 @@ export class Renderer {
       ctx.restore();
     }
 
-    // Low health red vignette effect
+    // Kill counter flash
+    this.drawKillFlash();
+
+    // Low health pulsing screen border
     if (healthRatio < 0.3 && healthRatio > 0) {
-      const intensity = (1 - healthRatio / 0.3) * 0.4;
-      const pulse = 1 + Math.sin(Date.now() * 0.005) * 0.3;
-      const gradient = ctx.createRadialGradient(
-        this.width / 2, this.height / 2, this.width * 0.3,
-        this.width / 2, this.height / 2, this.width * 0.7
-      );
-      gradient.addColorStop(0, 'transparent');
-      gradient.addColorStop(1, `rgba(255, 0, 0, ${intensity * pulse})`);
-      ctx.fillStyle = gradient;
-      ctx.fillRect(0, 0, this.width, this.height);
+      const alpha = (1 - healthRatio / 0.3 * 3.33) * (0.3 + 0.15 * Math.sin(state.time * 4));
+      if (alpha > 0) {
+        const gradient = ctx.createRadialGradient(
+          this.width / 2, this.height / 2, this.width * 0.3,
+          this.width / 2, this.height / 2, this.width * 0.7
+        );
+        gradient.addColorStop(0, 'transparent');
+        gradient.addColorStop(1, `rgba(255, 0, 0, ${Math.min(alpha, 1)})`);
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, this.width, this.height);
+      }
     }
 
     // Wave announcement banner
@@ -684,6 +805,15 @@ export class Renderer {
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 64px monospace';
     ctx.fillText(text, this.width / 2, this.height / 2 - 40);
+
+    // Wave event subtitle
+    if (this.waveAnnounceSubtitle) {
+      ctx.shadowBlur = 15;
+      ctx.shadowColor = '#ff4400';
+      ctx.fillStyle = '#ffd700';
+      ctx.font = 'bold 28px monospace';
+      ctx.fillText(this.waveAnnounceSubtitle, this.width / 2, this.height / 2 + 10);
+    }
 
     ctx.shadowBlur = 0;
     ctx.globalAlpha = 1;

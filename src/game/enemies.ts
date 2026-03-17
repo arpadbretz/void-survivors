@@ -77,6 +77,7 @@ export function createEnemy(
     phaseOffset: Math.random() * Math.PI * 2,
     shootCooldown: 0,
     lastShootTime: 0,
+    spawnTime: 0,
   };
 
   switch (type) {
@@ -201,10 +202,30 @@ export function createSplitEnemies(pos: Vector2, wave: number): Enemy[] {
   return results;
 }
 
+// ── Elite Modifier ──────────────────────────────────────────────
+
+export function makeElite(enemy: Enemy): Enemy {
+  enemy.isElite = true;
+  enemy.health = Math.round(enemy.health * 2.5);
+  enemy.maxHealth = Math.round(enemy.maxHealth * 2.5);
+  enemy.damage = Math.round(enemy.damage * 1.5);
+  enemy.speed = Math.round(enemy.speed * 1.2);
+  enemy.xpValue = Math.round(enemy.xpValue * 3);
+  enemy.color = '#ffd700';
+  enemy.glowColor = '#ffaa00';
+  return enemy;
+}
+
 // ── Spawning ────────────────────────────────────────────────────
 
 export class EnemyManager {
   private spawnTimer: number = 0;
+
+  // Wave event overrides
+  private swarmRushActive: boolean = false;
+  private swarmRushTimer: number = 0;
+  private forceEnemyType: EnemyType | null = null;
+  waveSpeedMultiplier: number = 1;
 
   spawnWave(
     wave: number,
@@ -226,6 +247,40 @@ export class EnemyManager {
     return newEnemies;
   }
 
+  /** Spawn tanks immediately for Tank Parade event */
+  spawnTankParade(
+    wave: number,
+    playerPos: Vector2,
+    worldSize: number
+  ): Enemy[] {
+    const tanks: Enemy[] = [];
+    for (let i = 0; i < 3; i++) {
+      const spawnPos = add(playerPos, randomOnCircle(randomRange(400, 700)));
+      spawnPos.x = Math.max(50, Math.min(worldSize - 50, spawnPos.x));
+      spawnPos.y = Math.max(50, Math.min(worldSize - 50, spawnPos.y));
+      const tank = createEnemy('tank', spawnPos, wave);
+      // Roll elite chance for tanks too
+      const eliteChance = Math.min(25, wave * 1.5) / 100;
+      if (Math.random() < eliteChance) {
+        makeElite(tank);
+      }
+      tanks.push(tank);
+    }
+    return tanks;
+  }
+
+  /** Activate Swarm Rush: triple spawn rate, only swarm for 10s */
+  activateSwarmRush(): void {
+    this.swarmRushActive = true;
+    this.swarmRushTimer = 10;
+    this.forceEnemyType = 'swarm';
+  }
+
+  /** Set speed multiplier for Speed Frenzy */
+  setWaveSpeedMultiplier(multiplier: number): void {
+    this.waveSpeedMultiplier = multiplier;
+  }
+
   updateSpawning(
     dt: number,
     wave: number,
@@ -236,12 +291,26 @@ export class EnemyManager {
     const config = getWaveConfig(wave);
     const spawned: Enemy[] = [];
 
+    // Update swarm rush timer
+    if (this.swarmRushActive) {
+      this.swarmRushTimer -= dt;
+      if (this.swarmRushTimer <= 0) {
+        this.swarmRushActive = false;
+        this.forceEnemyType = null;
+      }
+    }
+
+    // Effective spawn rate (tripled during Swarm Rush)
+    const effectiveSpawnRate = this.swarmRushActive
+      ? config.spawnRate / 3
+      : config.spawnRate;
+
     this.spawnTimer -= dt;
     if (this.spawnTimer <= 0 && currentEnemies.length < config.maxEnemies) {
-      this.spawnTimer = config.spawnRate;
+      this.spawnTimer = effectiveSpawnRate;
 
-      // Pick a random enemy type from the wave config
-      const type =
+      // Pick enemy type (forced during wave events, or random)
+      const type = this.forceEnemyType ??
         config.enemyTypes[Math.floor(Math.random() * config.enemyTypes.length)];
 
       // Spawn at a point off-screen around the player (400-700px away)
@@ -252,14 +321,26 @@ export class EnemyManager {
       spawnPos.x = Math.max(50, Math.min(worldSize - 50, spawnPos.x));
       spawnPos.y = Math.max(50, Math.min(worldSize - 50, spawnPos.y));
 
-      spawned.push(createEnemy(type, spawnPos, wave));
+      const enemy = createEnemy(type, spawnPos, wave);
+
+      // Roll elite chance: wave * 1.5%, capped at 25%
+      const eliteChance = Math.min(25, wave * 1.5) / 100;
+      if (Math.random() < eliteChance) {
+        makeElite(enemy);
+      }
+
+      spawned.push(enemy);
 
       // Swarm: spawn extra in a cluster
       if (type === 'swarm') {
         for (let i = 0; i < 4; i++) {
           const offset = { x: randomRange(-30, 30), y: randomRange(-30, 30) };
           const sPos = add(spawnPos, offset);
-          spawned.push(createEnemy('swarm', sPos, wave));
+          const swarmEnemy = createEnemy('swarm', sPos, wave);
+          if (Math.random() < eliteChance) {
+            makeElite(swarmEnemy);
+          }
+          spawned.push(swarmEnemy);
         }
       }
     }
@@ -269,6 +350,10 @@ export class EnemyManager {
 
   reset(): void {
     this.spawnTimer = 0;
+    this.swarmRushActive = false;
+    this.swarmRushTimer = 0;
+    this.forceEnemyType = null;
+    this.waveSpeedMultiplier = 1;
   }
 }
 
@@ -278,7 +363,8 @@ export function updateEnemies(
   enemies: Enemy[],
   player: Player,
   dt: number,
-  gameTime: number
+  gameTime: number,
+  speedMultiplier: number = 1
 ): Projectile[] {
   const newProjectiles: Projectile[] = [];
 
@@ -366,9 +452,9 @@ export function updateEnemies(
       }
     }
 
-    // Apply velocity
-    enemy.pos.x += enemy.vel.x * dt;
-    enemy.pos.y += enemy.vel.y * dt;
+    // Apply velocity (with wave speed multiplier)
+    enemy.pos.x += enemy.vel.x * dt * speedMultiplier;
+    enemy.pos.y += enemy.vel.y * dt * speedMultiplier;
   }
 
   return newProjectiles;

@@ -41,6 +41,8 @@ export interface Enemy extends Entity {
   lastShootTime?: number;
   phaseOffset?: number;
   rotation?: number;
+  isElite?: boolean;
+  spawnTime?: number;
 }
 
 export interface Projectile extends Entity {
