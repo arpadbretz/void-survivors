@@ -392,6 +392,11 @@ export default function HomePage() {
             description="Track your progress with milestones for kills, waves, combos, and more. How many can you unlock?"
           />
           <FeatureCard
+            icon={"✨"}
+            title="Meta-Progression"
+            description="Earn Void Essence from every run. Spend it on permanent upgrades to health, damage, speed, armor, and XP gain."
+          />
+          <FeatureCard
             icon={"🌐"}
             title="Zero Downloads"
             description="Runs entirely in your browser, on any device. Jump in instantly from desktop or mobile."

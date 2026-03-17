@@ -36,6 +36,7 @@ import {
   createAutoCannonAbility,
 } from './abilities';
 import { AudioManager } from './audio';
+import { loadMeta, getMetaBonuses, MetaBonuses } from './meta';
 
 // ── Constants ───────────────────────────────────────────────────
 
@@ -131,6 +132,15 @@ export class GameEngine {
 
   // Tutorial triggers
   private tutorialTriggered: Set<string> = new Set();
+
+  // Meta-progression bonuses applied at game start
+  private metaBonuses: MetaBonuses = {
+    maxHealthBonus: 0,
+    damageMultiplier: 1,
+    speedMultiplier: 1,
+    armorBonus: 0,
+    xpMultiplier: 1,
+  };
 
   // Bound event handlers for cleanup
   private boundKeyDown: ((e: KeyboardEvent) => void) | null = null;
@@ -301,6 +311,14 @@ export class GameEngine {
       screenShake: 0,
       camera,
     };
+
+    // Apply meta-progression bonuses
+    const meta = loadMeta();
+    const bonuses = getMetaBonuses(meta);
+    this.metaBonuses = bonuses;
+    this.state.player.maxHealth += bonuses.maxHealthBonus;
+    this.state.player.health = this.state.player.maxHealth;
+    this.state.player.speed *= bonuses.speedMultiplier;
 
     this.enemiesKilled = 0;
     this.bossesKilled = 0;
@@ -627,7 +645,8 @@ export class GameEngine {
 
       if (dist < p.radius + orb.radius) {
         orb.active = false;
-        p.xp += orb.value;
+        const xpGain = Math.floor(orb.value * this.metaBonuses.xpMultiplier);
+        p.xp += xpGain;
         this.state.score += orb.value;
         this.particles.emitXPPickup(orb.pos.x, orb.pos.y);
         this.audio.playPickup();
@@ -649,11 +668,12 @@ export class GameEngine {
 
         const dist = distance(proj.pos, enemy.pos);
         if (dist < proj.radius + enemy.radius) {
-          enemy.health -= proj.damage;
+          const actualDamage = Math.floor(proj.damage * this.metaBonuses.damageMultiplier);
+          enemy.health -= actualDamage;
           this.particles.emitDamageNumber(
             enemy.pos.x,
             enemy.pos.y,
-            proj.damage
+            actualDamage
           );
           this.particles.emit(proj.pos.x, proj.pos.y, 4, enemy.color, 60, 0.2);
           this.audio.playHit();
@@ -703,7 +723,8 @@ export class GameEngine {
     const p = this.state.player;
     if (this.state.time < p.invincibleUntil) return;
 
-    p.health -= amount;
+    const reducedAmount = Math.max(1, amount - this.metaBonuses.armorBonus);
+    p.health -= reducedAmount;
     p.lastDamageTime = this.state.time;
     p.invincibleUntil = this.state.time + 1.0;
     this.state.screenShake = Math.min(15, 4 + amount * 0.5);

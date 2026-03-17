@@ -40,7 +40,7 @@ interface AchievementToast {
   expiresAt: number;
 }
 
-type GameScreen = "menu" | "playing" | "paused" | "upgrade" | "gameover";
+type GameScreen = "menu" | "playing" | "paused" | "upgrade" | "gameover" | "achievements" | "stats" | "shop";
 
 interface HighScoreEntry {
   score: number;
@@ -165,7 +165,13 @@ export default function PlayPage() {
   const [achievementToasts, setAchievementToasts] = useState<AchievementToast[]>([]);
   const [lifetimeStats, setLifetimeStats] = useState<import("@/game/stats").LifetimeStats | null>(null);
   const [achievementCount, setAchievementCount] = useState({ unlocked: 0, total: 0 });
+  const [achievementFilter, setAchievementFilter] = useState<'all' | 'bronze' | 'silver' | 'gold' | 'platinum'>('all');
+  const [allAchievements, setAllAchievements] = useState<(import("@/game/achievements").Achievement & { unlocked: boolean })[]>([]);
   const audioRef = useRef<import("@/game/audio").AudioManager | null>(null);
+
+  // Meta-progression state
+  const [metaData, setMetaData] = useState<import("@/game/meta").MetaProgression | null>(null);
+  const [lastEssenceEarned, setLastEssenceEarned] = useState(0);
 
   // Joystick state
   const joystickRef = useRef<HTMLDivElement>(null);
@@ -183,12 +189,13 @@ export default function PlayPage() {
       setPersonalBest(scores[0].score);
     }
 
-    // Load achievement manager and lifetime stats
+    // Load achievement manager, lifetime stats, and meta-progression
     Promise.all([
       import("@/game/achievements"),
       import("@/game/stats"),
       import("@/game/audio"),
-    ]).then(([achMod, statsMod, audioMod]) => {
+      import("@/game/meta"),
+    ]).then(([achMod, statsMod, audioMod, metaMod]) => {
       const mgr = new achMod.AchievementManager();
       achievementManagerRef.current = mgr;
       setAchievementCount({ unlocked: mgr.getUnlockedCount(), total: mgr.getTotalCount() });
@@ -197,6 +204,8 @@ export default function PlayPage() {
       setLifetimeStats(stats);
 
       audioRef.current = audioMod.AudioManager.getInstance();
+
+      setMetaData(metaMod.loadMeta());
     });
   }, []);
 
@@ -315,6 +324,23 @@ export default function PlayPage() {
           });
         }
       }
+    } catch {
+      // ignore
+    }
+
+    // Earn void essence
+    try {
+      const metaMod = await import("@/game/meta");
+      const currentMeta = metaMod.loadMeta();
+      const { updated: updatedMeta, earned } = metaMod.earnEssence(
+        currentMeta,
+        stats.score,
+        stats.enemiesKilled,
+        stats.wavesSurvived
+      );
+      metaMod.saveMeta(updatedMeta);
+      setMetaData(updatedMeta);
+      setLastEssenceEarned(earned);
     } catch {
       // ignore
     }
@@ -648,6 +674,117 @@ export default function PlayPage() {
               </p>
             )}
 
+            <div style={{ marginTop: 20, display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
+              <button
+                onClick={() => {
+                  if (achievementManagerRef.current) {
+                    setAllAchievements(achievementManagerRef.current.getAll());
+                  }
+                  setAchievementFilter('all');
+                  setScreen("achievements");
+                }}
+                style={{
+                  background: "none",
+                  border: "1px solid rgba(0,238,255,0.3)",
+                  borderRadius: 8,
+                  color: "#00eeff",
+                  padding: "10px 20px",
+                  cursor: "pointer",
+                  fontSize: "0.95rem",
+                  fontFamily: "var(--font-geist-mono), monospace",
+                  letterSpacing: "0.05em",
+                  transition: "all 0.2s",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = "#00eeff";
+                  e.currentTarget.style.boxShadow = "0 0 12px rgba(0,238,255,0.3)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = "rgba(0,238,255,0.3)";
+                  e.currentTarget.style.boxShadow = "none";
+                }}
+              >
+                {"\u{1F3C6}"} Achievements
+              </button>
+              <button
+                onClick={() => {
+                  // Reload latest stats
+                  import("@/game/stats").then((mod) => {
+                    setLifetimeStats(mod.loadLifetimeStats());
+                  });
+                  setScreen("stats");
+                }}
+                style={{
+                  background: "none",
+                  border: "1px solid rgba(0,238,255,0.3)",
+                  borderRadius: 8,
+                  color: "#00eeff",
+                  padding: "10px 20px",
+                  cursor: "pointer",
+                  fontSize: "0.95rem",
+                  fontFamily: "var(--font-geist-mono), monospace",
+                  letterSpacing: "0.05em",
+                  transition: "all 0.2s",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = "#00eeff";
+                  e.currentTarget.style.boxShadow = "0 0 12px rgba(0,238,255,0.3)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = "rgba(0,238,255,0.3)";
+                  e.currentTarget.style.boxShadow = "none";
+                }}
+              >
+                {"\u{1F4CA}"} Stats
+              </button>
+              <button
+                onClick={() => {
+                  import("@/game/meta").then((mod) => {
+                    setMetaData(mod.loadMeta());
+                  });
+                  setScreen("shop");
+                }}
+                style={{
+                  background: "none",
+                  border: "1px solid rgba(170,102,255,0.3)",
+                  borderRadius: 8,
+                  color: "#aa66ff",
+                  padding: "10px 20px",
+                  cursor: "pointer",
+                  fontSize: "0.95rem",
+                  fontFamily: "var(--font-geist-mono), monospace",
+                  letterSpacing: "0.05em",
+                  transition: "all 0.2s",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = "#aa66ff";
+                  e.currentTarget.style.boxShadow = "0 0 12px rgba(170,102,255,0.3)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = "rgba(170,102,255,0.3)";
+                  e.currentTarget.style.boxShadow = "none";
+                }}
+              >
+                {"\u{2728}"} Upgrades
+              </button>
+            </div>
+
+            {/* Void Essence on menu */}
+            {metaData && metaData.voidEssence > 0 && (
+              <p
+                style={{
+                  color: "#aa66ff",
+                  fontSize: "0.85rem",
+                  marginTop: 12,
+                  letterSpacing: "0.08em",
+                  fontFamily: "var(--font-geist-mono), monospace",
+                  textShadow: "0 0 8px rgba(170,102,255,0.4)",
+                }}
+              >
+                {"\u{2728}"} {metaData.voidEssence.toLocaleString()} Void Essence
+              </p>
+            )}
+
             <button
               onClick={toggleSound}
               style={{
@@ -663,6 +800,528 @@ export default function PlayPage() {
             >
               {soundEnabled ? "\u{1F50A} Sound On" : "\u{1F507} Sound Off"}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ============== Achievement Gallery ============== */}
+      {screen === "achievements" && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            zIndex: 20,
+            background: "rgba(0,0,0,0.9)",
+            overflowY: "auto",
+            fontFamily: "var(--font-geist-mono), monospace",
+          }}
+        >
+          <div style={{ width: "100%", maxWidth: 900, padding: "40px 20px" }}>
+            {/* Header */}
+            <div style={{ textAlign: "center", marginBottom: 24 }}>
+              <h2
+                style={{
+                  fontSize: "2rem",
+                  fontWeight: 800,
+                  color: "#00eeff",
+                  textShadow: "0 0 10px #00eeff, 0 0 30px rgba(0,238,255,0.4)",
+                  margin: 0,
+                  letterSpacing: "0.1em",
+                }}
+              >
+                ACHIEVEMENTS
+              </h2>
+              <p style={{ color: "rgba(224,224,240,0.5)", fontSize: "1rem", marginTop: 8 }}>
+                {achievementCount.unlocked} / {achievementCount.total} Unlocked
+              </p>
+            </div>
+
+            {/* Filter Tabs */}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                gap: 8,
+                marginBottom: 28,
+                flexWrap: "wrap",
+              }}
+            >
+              {(["all", "bronze", "silver", "gold", "platinum"] as const).map((tier) => {
+                const isActive = achievementFilter === tier;
+                const tierColors: Record<string, string> = {
+                  all: "#00eeff",
+                  bronze: "#cd7f32",
+                  silver: "#c0c0c0",
+                  gold: "#ffd700",
+                  platinum: "#e5e4e2",
+                };
+                return (
+                  <button
+                    key={tier}
+                    onClick={() => setAchievementFilter(tier)}
+                    style={{
+                      background: isActive ? `${tierColors[tier]}22` : "transparent",
+                      border: `1px solid ${isActive ? tierColors[tier] : "rgba(255,255,255,0.15)"}`,
+                      borderRadius: 6,
+                      color: isActive ? tierColors[tier] : "rgba(224,224,240,0.4)",
+                      padding: "6px 16px",
+                      cursor: "pointer",
+                      fontSize: "0.8rem",
+                      textTransform: "capitalize",
+                      letterSpacing: "0.08em",
+                      fontFamily: "inherit",
+                      transition: "all 0.2s",
+                    }}
+                  >
+                    {tier}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Achievement Grid */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+                gap: 16,
+              }}
+            >
+              {allAchievements
+                .filter((a) => achievementFilter === "all" || a.tier === achievementFilter)
+                .map((achievement) => {
+                  const tierColor = (() => {
+                    switch (achievement.tier) {
+                      case 'bronze': return '#cd7f32';
+                      case 'silver': return '#c0c0c0';
+                      case 'gold': return '#ffd700';
+                      case 'platinum': return '#e5e4e2';
+                    }
+                  })();
+                  return (
+                    <div
+                      key={achievement.id}
+                      style={{
+                        background: achievement.unlocked
+                          ? "rgba(255,255,255,0.05)"
+                          : "rgba(255,255,255,0.02)",
+                        border: `1px solid ${achievement.unlocked ? tierColor : "rgba(255,255,255,0.08)"}`,
+                        borderRadius: 10,
+                        padding: 16,
+                        opacity: achievement.unlocked ? 1 : 0.4,
+                        transition: "all 0.2s",
+                      }}
+                    >
+                      <div style={{ fontSize: "1.8rem", marginBottom: 8 }}>
+                        {achievement.unlocked ? achievement.icon : "\u{1F512}"}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: "0.9rem",
+                          fontWeight: 700,
+                          color: achievement.unlocked ? tierColor : "rgba(224,224,240,0.4)",
+                          marginBottom: 4,
+                          letterSpacing: "0.05em",
+                        }}
+                      >
+                        {achievement.name}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: "0.75rem",
+                          color: "rgba(224,224,240,0.45)",
+                          lineHeight: 1.4,
+                        }}
+                      >
+                        {achievement.unlocked ? achievement.description : "???"}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: "0.65rem",
+                          color: tierColor,
+                          marginTop: 8,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.12em",
+                          opacity: achievement.unlocked ? 0.8 : 0.4,
+                        }}
+                      >
+                        {achievement.tier}
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+
+            {/* Back Button */}
+            <div style={{ textAlign: "center", marginTop: 36 }}>
+              <button
+                onClick={() => setScreen("menu")}
+                style={{
+                  background: "none",
+                  border: "1px solid rgba(0,238,255,0.3)",
+                  borderRadius: 8,
+                  color: "#00eeff",
+                  padding: "10px 32px",
+                  cursor: "pointer",
+                  fontSize: "1rem",
+                  fontFamily: "inherit",
+                  letterSpacing: "0.08em",
+                  transition: "all 0.2s",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = "#00eeff";
+                  e.currentTarget.style.boxShadow = "0 0 12px rgba(0,238,255,0.3)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = "rgba(0,238,255,0.3)";
+                  e.currentTarget.style.boxShadow = "none";
+                }}
+              >
+                {"\u2190"} Back to Menu
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============== Stats Dashboard ============== */}
+      {screen === "stats" && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 20,
+            background: "rgba(0,0,0,0.9)",
+            fontFamily: "var(--font-geist-mono), monospace",
+          }}
+        >
+          <div style={{ width: "100%", maxWidth: 500, padding: "40px 20px" }}>
+            {/* Header */}
+            <div style={{ textAlign: "center", marginBottom: 32 }}>
+              <h2
+                style={{
+                  fontSize: "2rem",
+                  fontWeight: 800,
+                  color: "#00eeff",
+                  textShadow: "0 0 10px #00eeff, 0 0 30px rgba(0,238,255,0.4)",
+                  margin: 0,
+                  letterSpacing: "0.1em",
+                }}
+              >
+                LIFETIME STATS
+              </h2>
+            </div>
+
+            {/* Stat Rows */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {(() => {
+                const s = lifetimeStats || {
+                  gamesPlayed: 0, totalKills: 0, totalPlaytime: 0, totalScore: 0,
+                  highestScore: 0, highestWave: 0, highestLevel: 0, highestCombo: 0, bossesKilled: 0,
+                };
+                const hours = Math.floor(s.totalPlaytime / 3600);
+                const mins = Math.floor((s.totalPlaytime % 3600) / 60);
+                const secs = Math.floor(s.totalPlaytime % 60);
+                const playtimeStr = `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+
+                const stats = [
+                  { icon: "\u{1F3AE}", label: "Games Played", value: s.gamesPlayed.toLocaleString() },
+                  { icon: "\u{1F5E1}\u{FE0F}", label: "Total Kills", value: s.totalKills.toLocaleString() },
+                  { icon: "\u{23F1}\u{FE0F}", label: "Total Playtime", value: playtimeStr },
+                  { icon: "\u{2B50}", label: "Total Score", value: s.totalScore.toLocaleString() },
+                  { icon: "\u{1F3C6}", label: "Highest Score", value: s.highestScore.toLocaleString() },
+                  { icon: "\u{1F30A}", label: "Highest Wave", value: s.highestWave.toLocaleString() },
+                  { icon: "\u{1F4AA}", label: "Highest Level", value: s.highestLevel.toLocaleString() },
+                  { icon: "\u{26A1}", label: "Highest Combo", value: `${s.highestCombo.toLocaleString()}x` },
+                  { icon: "\u{1F479}", label: "Bosses Killed", value: s.bossesKilled.toLocaleString() },
+                ];
+
+                return stats.map((stat) => (
+                  <div
+                    key={stat.label}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "12px 16px",
+                      background: "rgba(255,255,255,0.03)",
+                      border: "1px solid rgba(0,238,255,0.1)",
+                      borderRadius: 8,
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <span style={{ fontSize: "1.2rem" }}>{stat.icon}</span>
+                      <span style={{ color: "rgba(224,224,240,0.6)", fontSize: "0.85rem", letterSpacing: "0.05em" }}>
+                        {stat.label}
+                      </span>
+                    </div>
+                    <span
+                      style={{
+                        color: "#00eeff",
+                        fontSize: "1rem",
+                        fontWeight: 700,
+                        letterSpacing: "0.05em",
+                        textShadow: "0 0 6px rgba(0,238,255,0.3)",
+                      }}
+                    >
+                      {stat.value}
+                    </span>
+                  </div>
+                ));
+              })()}
+            </div>
+
+            {/* Back Button */}
+            <div style={{ textAlign: "center", marginTop: 36 }}>
+              <button
+                onClick={() => setScreen("menu")}
+                style={{
+                  background: "none",
+                  border: "1px solid rgba(0,238,255,0.3)",
+                  borderRadius: 8,
+                  color: "#00eeff",
+                  padding: "10px 32px",
+                  cursor: "pointer",
+                  fontSize: "1rem",
+                  fontFamily: "inherit",
+                  letterSpacing: "0.08em",
+                  transition: "all 0.2s",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = "#00eeff";
+                  e.currentTarget.style.boxShadow = "0 0 12px rgba(0,238,255,0.3)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = "rgba(0,238,255,0.3)";
+                  e.currentTarget.style.boxShadow = "none";
+                }}
+              >
+                {"\u2190"} Back to Menu
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============== Upgrades Shop ============== */}
+      {screen === "shop" && metaData && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 20,
+            background: "rgba(0,0,0,0.92)",
+            fontFamily: "var(--font-geist-mono), monospace",
+            overflow: "auto",
+          }}
+        >
+          <div style={{ width: "100%", maxWidth: 560, padding: "40px 20px" }}>
+            {/* Header */}
+            <div style={{ textAlign: "center", marginBottom: 12 }}>
+              <h2
+                style={{
+                  fontSize: "2rem",
+                  fontWeight: 800,
+                  color: "#aa66ff",
+                  textShadow: "0 0 10px #aa66ff, 0 0 30px rgba(170,102,255,0.4)",
+                  margin: 0,
+                  letterSpacing: "0.1em",
+                }}
+              >
+                VOID UPGRADES
+              </h2>
+              <p
+                style={{
+                  color: "rgba(224,224,240,0.5)",
+                  fontSize: "0.8rem",
+                  marginTop: 8,
+                  letterSpacing: "0.05em",
+                }}
+              >
+                Permanent upgrades that persist across runs
+              </p>
+            </div>
+
+            {/* Essence Balance */}
+            <div
+              style={{
+                textAlign: "center",
+                marginBottom: 28,
+                fontSize: "1.3rem",
+                color: "#aa66ff",
+                fontWeight: 700,
+                textShadow: "0 0 12px rgba(170,102,255,0.5)",
+              }}
+            >
+              {"\u{2728}"} {metaData.voidEssence.toLocaleString()} Void Essence
+            </div>
+
+            {/* Upgrade Cards */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {(() => {
+                // Import synchronously since we loaded on mount
+                const definitions = [
+                  { id: 'maxHealthBonus' as const, name: 'Void Vitality', description: 'Increase maximum health.', icon: '\u{1F49A}', maxLevel: 10, costs: [50,100,175,275,400,550,725,925,1150,1400], effectPerLevel: '+5 HP' },
+                  { id: 'damageBonus' as const, name: 'Void Strike', description: 'Increase all damage dealt.', icon: '\u{2694}\u{FE0F}', maxLevel: 10, costs: [75,150,250,375,525,700,900,1125,1375,1650], effectPerLevel: '+2% Damage' },
+                  { id: 'speedBonus' as const, name: 'Void Swiftness', description: 'Increase movement speed.', icon: '\u{1F4A8}', maxLevel: 10, costs: [60,120,200,300,420,560,720,900,1100,1320], effectPerLevel: '+3% Speed' },
+                  { id: 'armorBonus' as const, name: 'Void Shell', description: 'Reduce incoming damage.', icon: '\u{1F6E1}\u{FE0F}', maxLevel: 10, costs: [100,200,325,475,650,850,1075,1325,1600,1900], effectPerLevel: '+1 Armor' },
+                  { id: 'xpBonus' as const, name: 'Void Wisdom', description: 'Increase XP gained.', icon: '\u{2728}', maxLevel: 10, costs: [80,160,265,395,550,730,935,1165,1420,1700], effectPerLevel: '+5% XP' },
+                ];
+
+                return definitions.map((def) => {
+                  const currentLevel = metaData.upgrades[def.id];
+                  const isMaxed = currentLevel >= def.maxLevel;
+                  const cost = isMaxed ? 0 : def.costs[currentLevel];
+                  const canAfford = !isMaxed && metaData.voidEssence >= cost;
+
+                  return (
+                    <div
+                      key={def.id}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        padding: "14px 16px",
+                        background: "rgba(170,102,255,0.04)",
+                        border: `1px solid ${isMaxed ? "rgba(170,102,255,0.3)" : "rgba(170,102,255,0.12)"}`,
+                        borderRadius: 10,
+                        gap: 12,
+                      }}
+                    >
+                      {/* Icon and info */}
+                      <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1 }}>
+                        <span style={{ fontSize: "1.4rem" }}>{def.icon}</span>
+                        <div>
+                          <div style={{ color: "#e0e0f0", fontSize: "0.9rem", fontWeight: 700 }}>
+                            {def.name}
+                          </div>
+                          <div style={{ color: "rgba(224,224,240,0.45)", fontSize: "0.72rem", marginTop: 2 }}>
+                            {def.description} ({def.effectPerLevel}/level)
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Level indicator */}
+                      <div style={{ display: "flex", gap: 2, marginRight: 8 }}>
+                        {Array.from({ length: def.maxLevel }, (_, i) => (
+                          <div
+                            key={i}
+                            style={{
+                              width: 5,
+                              height: 16,
+                              borderRadius: 2,
+                              background: i < currentLevel
+                                ? "#aa66ff"
+                                : "rgba(170,102,255,0.15)",
+                              boxShadow: i < currentLevel ? "0 0 4px rgba(170,102,255,0.5)" : "none",
+                            }}
+                          />
+                        ))}
+                      </div>
+
+                      {/* Buy button */}
+                      {isMaxed ? (
+                        <span
+                          style={{
+                            fontSize: "0.75rem",
+                            color: "#aa66ff",
+                            fontWeight: 700,
+                            letterSpacing: "0.1em",
+                            minWidth: 60,
+                            textAlign: "center",
+                          }}
+                        >
+                          MAX
+                        </span>
+                      ) : (
+                        <button
+                          disabled={!canAfford}
+                          onClick={async () => {
+                            const metaMod = await import("@/game/meta");
+                            const result = metaMod.purchaseUpgrade(metaData, def.id);
+                            if (result) {
+                              metaMod.saveMeta(result);
+                              setMetaData(result);
+                            }
+                          }}
+                          style={{
+                            background: canAfford ? "rgba(170,102,255,0.2)" : "rgba(255,255,255,0.03)",
+                            border: `1px solid ${canAfford ? "rgba(170,102,255,0.5)" : "rgba(255,255,255,0.1)"}`,
+                            borderRadius: 6,
+                            color: canAfford ? "#aa66ff" : "rgba(224,224,240,0.25)",
+                            padding: "6px 12px",
+                            cursor: canAfford ? "pointer" : "not-allowed",
+                            fontSize: "0.78rem",
+                            fontFamily: "inherit",
+                            fontWeight: 700,
+                            letterSpacing: "0.05em",
+                            minWidth: 60,
+                            transition: "all 0.2s",
+                          }}
+                        >
+                          {cost.toLocaleString()}
+                        </button>
+                      )}
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+
+            {/* Total Earned */}
+            {metaData.totalEssenceEarned > 0 && (
+              <p
+                style={{
+                  textAlign: "center",
+                  marginTop: 20,
+                  fontSize: "0.72rem",
+                  color: "rgba(224,224,240,0.25)",
+                  letterSpacing: "0.05em",
+                }}
+              >
+                Total essence earned: {metaData.totalEssenceEarned.toLocaleString()}
+              </p>
+            )}
+
+            {/* Back Button */}
+            <div style={{ textAlign: "center", marginTop: 28 }}>
+              <button
+                onClick={() => setScreen("menu")}
+                style={{
+                  background: "none",
+                  border: "1px solid rgba(170,102,255,0.3)",
+                  borderRadius: 8,
+                  color: "#aa66ff",
+                  padding: "10px 32px",
+                  cursor: "pointer",
+                  fontSize: "1rem",
+                  fontFamily: "inherit",
+                  letterSpacing: "0.08em",
+                  transition: "all 0.2s",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = "#aa66ff";
+                  e.currentTarget.style.boxShadow = "0 0 12px rgba(170,102,255,0.3)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = "rgba(170,102,255,0.3)";
+                  e.currentTarget.style.boxShadow = "none";
+                }}
+              >
+                {"\u2190"} Back to Menu
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1403,11 +2062,27 @@ export default function PlayPage() {
               </div>
             )}
 
+            {/* Void Essence Earned */}
+            {lastEssenceEarned > 0 && (
+              <div
+                style={{
+                  marginTop: 20,
+                  fontSize: "1rem",
+                  color: "#aa66ff",
+                  fontFamily: "var(--font-geist-mono), monospace",
+                  letterSpacing: "0.08em",
+                  textShadow: "0 0 12px rgba(170,102,255,0.5)",
+                }}
+              >
+                +{lastEssenceEarned} Void Essence earned
+              </div>
+            )}
+
             {/* Achievement Progress */}
             {achievementCount.total > 0 && (
               <div
                 style={{
-                  marginTop: 20,
+                  marginTop: 12,
                   fontSize: "0.8rem",
                   color: "rgba(224,224,240,0.4)",
                   letterSpacing: "0.1em",
