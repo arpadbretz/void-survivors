@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 const SITE_URL = "https://void-survivors.vercel.app";
 const TITLE = "Void Survivors — A Neon Roguelike";
 const DESCRIPTION =
-  "Survive endless waves of geometric enemies in this free browser-based action roguelike. No downloads, no installs — just pure neon chaos. WASD to move, auto-fire abilities, and level up with powerful upgrades.";
+  "Survive endless waves of geometric enemies in this free browser-based action roguelike. 9 abilities with 4 evolutions, 6 enemy types with elite variants, 3 playable characters, 25 achievements, and meta-progression. No downloads — just pure neon chaos.";
 const OG_IMAGE = `${SITE_URL}/api/og`;
 
 export const metadata: Metadata = {

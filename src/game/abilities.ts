@@ -555,6 +555,16 @@ export function createAutoCannonAbility(): Ability {
   return autoCannon();
 }
 
+export function createOrbitShieldAbility(): Ability {
+  return orbitShield();
+}
+
+export function createAbilityById(id: string): Ability | null {
+  const factory = ABILITY_REGISTRY.find((f) => f().id === id);
+  if (!factory) return null;
+  return factory();
+}
+
 export function getRandomUpgradeChoices(player: Player, count: number = 3): Ability[] {
   const choices: Ability[] = [];
 

@@ -34,9 +34,11 @@ import {
   getAbilityDescription,
   createStarterAbility,
   createAutoCannonAbility,
+  createAbilityById,
 } from './abilities';
 import { AudioManager } from './audio';
 import { loadMeta, getMetaBonuses, MetaBonuses } from './meta';
+import { getCharacter, CharacterDef } from './characters';
 
 // ── Constants ───────────────────────────────────────────────────
 
@@ -132,6 +134,10 @@ export class GameEngine {
 
   // Tutorial triggers
   private tutorialTriggered: Set<string> = new Set();
+
+  // Character selection
+  private characterId: string = 'void_walker';
+  private characterDef: CharacterDef = getCharacter('void_walker');
 
   // Meta-progression bonuses applied at game start
   private metaBonuses: MetaBonuses = {
@@ -237,6 +243,11 @@ export class GameEngine {
     this.running = false;
   }
 
+  setCharacter(characterId: string): void {
+    this.characterId = characterId;
+    this.characterDef = getCharacter(characterId);
+  }
+
   setSoundEnabled(enabled: boolean): void {
     this.soundEnabled = enabled;
     if (enabled) this.audio.unmute();
@@ -261,30 +272,35 @@ export class GameEngine {
 
   private initState(): void {
     const center = WORLD_SIZE / 2;
+    const charDef = this.characterDef;
 
     const player: Player = {
       id: 'player',
       pos: vec2(center, center),
       vel: vec2(0, 0),
       radius: 16,
-      health: 100,
-      maxHealth: 100,
+      health: charDef.baseHealth,
+      maxHealth: charDef.baseHealth,
       type: 'player',
-      color: '#00eeff',
-      glowColor: '#00ddff',
+      color: charDef.color,
+      glowColor: charDef.glowColor,
       active: true,
       xp: 0,
       level: 1,
-      speed: 200,
+      speed: charDef.baseSpeed,
       damage: 10,
       abilities: [],
       invincibleUntil: 2, // 2 seconds of initial invincibility
       lastDamageTime: 0,
     };
 
-    // Give player starting abilities
-    player.abilities.push(createStarterAbility());
-    player.abilities.push(createAutoCannonAbility());
+    // Give player starting ability based on character
+    const startingAbility = createAbilityById(charDef.startingAbilityId);
+    if (startingAbility) {
+      player.abilities.push(startingAbility);
+    } else {
+      player.abilities.push(createStarterAbility());
+    }
 
     const camera: Camera = {
       x: center,
@@ -583,9 +599,11 @@ export class GameEngine {
       this.particles.emitTrail(p.pos.x, p.pos.y, '#00aacc');
     }
 
-    // Passive health regeneration: 1 HP per 3 seconds
+    // Passive health regeneration: 1 HP per 3 seconds + character bonus
     if (p.health < p.maxHealth) {
-      p.health = Math.min(p.maxHealth, p.health + (1 / 3) * dt);
+      const baseRegen = 1 / 3; // HP per second
+      const charRegen = this.characterDef.healthRegen; // additional HP per second
+      p.health = Math.min(p.maxHealth, p.health + (baseRegen + charRegen) * dt);
     }
   }
 
@@ -647,7 +665,7 @@ export class GameEngine {
 
       if (dist < p.radius + orb.radius) {
         orb.active = false;
-        const xpGain = Math.floor(orb.value * this.metaBonuses.xpMultiplier);
+        const xpGain = Math.floor(orb.value * this.metaBonuses.xpMultiplier * this.characterDef.xpMultiplier);
         p.xp += xpGain;
         this.state.score += orb.value;
         this.particles.emitXPPickup(orb.pos.x, orb.pos.y);
@@ -670,7 +688,7 @@ export class GameEngine {
 
         const dist = distance(proj.pos, enemy.pos);
         if (dist < proj.radius + enemy.radius) {
-          const actualDamage = Math.floor(proj.damage * this.metaBonuses.damageMultiplier);
+          const actualDamage = Math.floor(proj.damage * this.metaBonuses.damageMultiplier * this.characterDef.damageMultiplier);
           enemy.health -= actualDamage;
           this.particles.emitDamageNumber(
             enemy.pos.x,
@@ -743,7 +761,7 @@ export class GameEngine {
     const p = this.state.player;
     if (this.state.time < p.invincibleUntil) return;
 
-    const reducedAmount = Math.max(1, amount - this.metaBonuses.armorBonus);
+    const reducedAmount = Math.max(1, amount - this.metaBonuses.armorBonus - this.characterDef.baseArmor);
     p.health -= reducedAmount;
     p.lastDamageTime = this.state.time;
     p.invincibleUntil = this.state.time + 1.0;

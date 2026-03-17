@@ -40,7 +40,7 @@ interface AchievementToast {
   expiresAt: number;
 }
 
-type GameScreen = "menu" | "playing" | "paused" | "upgrade" | "gameover" | "achievements" | "stats" | "shop";
+type GameScreen = "menu" | "playing" | "paused" | "upgrade" | "gameover" | "achievements" | "stats" | "shop" | "characters";
 
 interface HighScoreEntry {
   score: number;
@@ -100,6 +100,7 @@ interface GameEngineInterface {
   selectUpgrade: (index: number) => void;
   restart: () => void;
   setSoundEnabled: (enabled: boolean) => void;
+  setCharacter: (characterId: string) => void;
   startAttractMode: (canvas: HTMLCanvasElement) => void;
   stopAttractMode: () => void;
 }
@@ -173,6 +174,10 @@ export default function PlayPage() {
   const [metaData, setMetaData] = useState<import("@/game/meta").MetaProgression | null>(null);
   const [lastEssenceEarned, setLastEssenceEarned] = useState(0);
 
+  // Character selection state
+  const [selectedCharacter, setSelectedCharacter] = useState<string>("void_walker");
+  const [characterDefs, setCharacterDefs] = useState<import("@/game/characters").CharacterDef[]>([]);
+
   // Joystick state
   const joystickRef = useRef<HTMLDivElement>(null);
   const [joystickActive, setJoystickActive] = useState(false);
@@ -192,13 +197,20 @@ export default function PlayPage() {
       setPersonalBest(scores[0].score);
     }
 
+    // Load saved character selection
+    try {
+      const savedChar = localStorage.getItem("void-survivors-character");
+      if (savedChar) setSelectedCharacter(savedChar);
+    } catch { /* ignore */ }
+
     // Load achievement manager, lifetime stats, and meta-progression
     Promise.all([
       import("@/game/achievements"),
       import("@/game/stats"),
       import("@/game/audio"),
       import("@/game/meta"),
-    ]).then(([achMod, statsMod, audioMod, metaMod]) => {
+      import("@/game/characters"),
+    ]).then(([achMod, statsMod, audioMod, metaMod, charMod]) => {
       const mgr = new achMod.AchievementManager();
       achievementManagerRef.current = mgr;
       setAchievementCount({ unlocked: mgr.getUnlockedCount(), total: mgr.getTotalCount() });
@@ -209,6 +221,7 @@ export default function PlayPage() {
       audioRef.current = audioMod.AudioManager.getInstance();
 
       setMetaData(metaMod.loadMeta());
+      setCharacterDefs(charMod.getCharacters());
     });
   }, []);
 
@@ -429,6 +442,7 @@ export default function PlayPage() {
   const startGame = useCallback(() => {
     if (!canvasRef.current || !engineRef.current) return;
     engineRef.current.stopAttractMode();
+    engineRef.current.setCharacter(selectedCharacter);
     engineRef.current.start(canvasRef.current, {
       onStateChange: handleStateChange,
       onLevelUp: handleLevelUp,
@@ -437,7 +451,7 @@ export default function PlayPage() {
     });
     engineRef.current.setSoundEnabled(soundEnabled);
     setScreen("playing");
-  }, [handleStateChange, handleLevelUp, handleGameOver, handleAchievementCheck, soundEnabled]);
+  }, [handleStateChange, handleLevelUp, handleGameOver, handleAchievementCheck, soundEnabled, selectedCharacter]);
 
   // -----------------------------------------------------------------------
   // Select upgrade
@@ -456,6 +470,7 @@ export default function PlayPage() {
   // -----------------------------------------------------------------------
   const restartGame = useCallback(() => {
     engineRef.current?.restart();
+    engineRef.current?.setCharacter(selectedCharacter);
     engineRef.current?.start(canvasRef.current!, {
       onStateChange: handleStateChange,
       onLevelUp: handleLevelUp,
@@ -463,7 +478,7 @@ export default function PlayPage() {
       onAchievementCheck: handleAchievementCheck,
     });
     setScreen("playing");
-  }, [handleStateChange, handleLevelUp, handleGameOver, handleAchievementCheck]);
+  }, [handleStateChange, handleLevelUp, handleGameOver, handleAchievementCheck, selectedCharacter]);
 
   const resumeGame = useCallback(() => {
     engineRef.current?.resume();
@@ -721,6 +736,36 @@ export default function PlayPage() {
             <div style={{ marginTop: 20, display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
               <button
                 onClick={() => {
+                  import("@/game/characters").then((mod) => {
+                    setCharacterDefs(mod.getCharacters());
+                  });
+                  setScreen("characters");
+                }}
+                style={{
+                  background: "none",
+                  border: "1px solid rgba(0,255,136,0.3)",
+                  borderRadius: 8,
+                  color: "#00ff88",
+                  padding: "10px 20px",
+                  cursor: "pointer",
+                  fontSize: "0.95rem",
+                  fontFamily: "var(--font-geist-mono), monospace",
+                  letterSpacing: "0.05em",
+                  transition: "all 0.2s",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = "#00ff88";
+                  e.currentTarget.style.boxShadow = "0 0 12px rgba(0,255,136,0.3)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = "rgba(0,255,136,0.3)";
+                  e.currentTarget.style.boxShadow = "none";
+                }}
+              >
+                {"\u{1F464}"} Characters
+              </button>
+              <button
+                onClick={() => {
                   if (achievementManagerRef.current) {
                     setAllAchievements(achievementManagerRef.current.getAll());
                   }
@@ -845,6 +890,236 @@ export default function PlayPage() {
               {soundEnabled ? "\u{1F50A} Sound On" : "\u{1F507} Sound Off"}
             </button>
           </div>
+        </div>
+      )}
+
+      {/* ============== Character Selection ============== */}
+      {screen === "characters" && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 20,
+            background: "rgba(10, 10, 18, 0.92)",
+            overflow: "auto",
+            padding: "40px 16px",
+          }}
+        >
+          <h2
+            style={{
+              fontSize: "clamp(1.6rem, 4vw, 2.5rem)",
+              fontWeight: 800,
+              color: "#00ff88",
+              textShadow: "0 0 20px rgba(0,255,136,0.5)",
+              marginBottom: 8,
+              letterSpacing: "0.1em",
+            }}
+          >
+            {"\u{1F464}"} CHARACTERS
+          </h2>
+          <p
+            style={{
+              color: "rgba(224,224,240,0.5)",
+              fontSize: "0.9rem",
+              marginBottom: 32,
+              letterSpacing: "0.05em",
+            }}
+          >
+            Choose your survivor
+          </p>
+
+          <div
+            style={{
+              display: "flex",
+              gap: 20,
+              flexWrap: "wrap",
+              justifyContent: "center",
+              maxWidth: 900,
+            }}
+          >
+            {characterDefs.map((char) => {
+              const stats = lifetimeStats || { totalKills: 0, gamesPlayed: 0, totalPlaytime: 0, totalScore: 0, highestWave: 0, highestLevel: 0, highestCombo: 0, highestScore: 0, bossesKilled: 0 };
+              const unlocked = char.unlockCondition({ totalKills: stats.totalKills, gamesPlayed: stats.gamesPlayed });
+              const isSelected = selectedCharacter === char.id;
+
+              return (
+                <div
+                  key={char.id}
+                  onClick={() => {
+                    if (unlocked) {
+                      setSelectedCharacter(char.id);
+                      try { localStorage.setItem("void-survivors-character", char.id); } catch { /* ignore */ }
+                    }
+                  }}
+                  style={{
+                    width: 250,
+                    padding: 20,
+                    borderRadius: 12,
+                    border: isSelected
+                      ? `2px solid ${char.color}`
+                      : unlocked
+                        ? "1px solid rgba(255,255,255,0.15)"
+                        : "1px solid rgba(255,255,255,0.06)",
+                    background: isSelected
+                      ? `linear-gradient(135deg, rgba(${parseInt(char.color.slice(1,3),16)},${parseInt(char.color.slice(3,5),16)},${parseInt(char.color.slice(5,7),16)},0.15), rgba(10,10,18,0.9))`
+                      : "rgba(15,15,25,0.8)",
+                    cursor: unlocked ? "pointer" : "default",
+                    opacity: unlocked ? 1 : 0.5,
+                    transition: "all 0.25s ease",
+                    boxShadow: isSelected
+                      ? `0 0 20px rgba(${parseInt(char.color.slice(1,3),16)},${parseInt(char.color.slice(3,5),16)},${parseInt(char.color.slice(5,7),16)},0.3), inset 0 0 30px rgba(${parseInt(char.color.slice(1,3),16)},${parseInt(char.color.slice(3,5),16)},${parseInt(char.color.slice(5,7),16)},0.05)`
+                      : "none",
+                    position: "relative",
+                    overflow: "hidden",
+                  }}
+                >
+                  {/* Selected indicator */}
+                  {isSelected && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: 8,
+                        right: 10,
+                        fontSize: "0.7rem",
+                        color: char.color,
+                        fontFamily: "var(--font-geist-mono), monospace",
+                        letterSpacing: "0.1em",
+                        textShadow: `0 0 8px ${char.color}`,
+                      }}
+                    >
+                      SELECTED
+                    </div>
+                  )}
+
+                  {/* Icon and name */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+                    <span style={{ fontSize: "2.2rem", filter: unlocked ? "none" : "grayscale(1)" }}>{char.icon}</span>
+                    <div>
+                      <div
+                        style={{
+                          fontSize: "1.15rem",
+                          fontWeight: 700,
+                          color: unlocked ? char.color : "rgba(224,224,240,0.3)",
+                          textShadow: unlocked ? `0 0 10px ${char.glowColor}` : "none",
+                          letterSpacing: "0.05em",
+                        }}
+                      >
+                        {char.name}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: "0.8rem",
+                          color: unlocked ? "rgba(224,224,240,0.6)" : "rgba(224,224,240,0.25)",
+                          fontStyle: "italic",
+                          marginTop: 2,
+                        }}
+                      >
+                        {char.description}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Stats */}
+                  {unlocked ? (
+                    <div style={{ fontSize: "0.78rem", fontFamily: "var(--font-geist-mono), monospace", lineHeight: 1.8 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", color: "rgba(224,224,240,0.5)" }}>
+                        <span>HP</span>
+                        <span style={{ color: char.baseHealth > 100 ? "#00ff88" : char.baseHealth < 100 ? "#ff4466" : "rgba(224,224,240,0.7)" }}>
+                          {char.baseHealth}
+                        </span>
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", color: "rgba(224,224,240,0.5)" }}>
+                        <span>Speed</span>
+                        <span style={{ color: char.baseSpeed > 200 ? "#00ff88" : char.baseSpeed < 200 ? "#ff4466" : "rgba(224,224,240,0.7)" }}>
+                          {char.baseSpeed}
+                        </span>
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", color: "rgba(224,224,240,0.5)" }}>
+                        <span>Armor</span>
+                        <span style={{ color: char.baseArmor > 0 ? "#00ff88" : "rgba(224,224,240,0.7)" }}>
+                          {char.baseArmor}
+                        </span>
+                      </div>
+                      {char.damageMultiplier !== 1.0 && (
+                        <div style={{ display: "flex", justifyContent: "space-between", color: "rgba(224,224,240,0.5)" }}>
+                          <span>Damage</span>
+                          <span style={{ color: "#00ff88" }}>+{Math.round((char.damageMultiplier - 1) * 100)}%</span>
+                        </div>
+                      )}
+                      {char.xpMultiplier !== 1.0 && (
+                        <div style={{ display: "flex", justifyContent: "space-between", color: "rgba(224,224,240,0.5)" }}>
+                          <span>XP Gain</span>
+                          <span style={{ color: "#00ff88" }}>+{Math.round((char.xpMultiplier - 1) * 100)}%</span>
+                        </div>
+                      )}
+                      {char.healthRegen > 0 && (
+                        <div style={{ display: "flex", justifyContent: "space-between", color: "rgba(224,224,240,0.5)" }}>
+                          <span>Regen</span>
+                          <span style={{ color: "#00ff88" }}>+{(char.healthRegen * 5).toFixed(0)} HP/5s</span>
+                        </div>
+                      )}
+                      <div
+                        style={{
+                          marginTop: 8,
+                          paddingTop: 8,
+                          borderTop: "1px solid rgba(255,255,255,0.08)",
+                          color: "rgba(224,224,240,0.4)",
+                          fontSize: "0.72rem",
+                        }}
+                      >
+                        Starting ability: <span style={{ color: char.color }}>{char.startingAbilityId.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        marginTop: 8,
+                        padding: "12px 0",
+                        textAlign: "center",
+                        fontSize: "0.82rem",
+                        color: "#ff6644",
+                        fontFamily: "var(--font-geist-mono), monospace",
+                        letterSpacing: "0.03em",
+                      }}
+                    >
+                      {"\u{1F512}"} {char.unlockDescription}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <button
+            onClick={() => setScreen("menu")}
+            style={{
+              marginTop: 32,
+              background: "none",
+              border: "1px solid rgba(0,238,255,0.3)",
+              borderRadius: 8,
+              color: "#00eeff",
+              padding: "10px 32px",
+              cursor: "pointer",
+              fontSize: "1rem",
+              fontFamily: "var(--font-geist-mono), monospace",
+              letterSpacing: "0.08em",
+              transition: "all 0.2s",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = "#00eeff";
+              e.currentTarget.style.boxShadow = "0 0 12px rgba(0,238,255,0.3)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = "rgba(0,238,255,0.3)";
+              e.currentTarget.style.boxShadow = "none";
+            }}
+          >
+            Back to Menu
+          </button>
         </div>
       )}
 

@@ -273,6 +273,18 @@ export default function HomePage() {
           >
             Controls
           </a>
+          <a
+            href="#whats-new"
+            style={{
+              color: "rgba(224,224,240,0.5)",
+              textDecoration: "none",
+              fontSize: "0.9rem",
+              letterSpacing: "0.05em",
+              transition: "color 0.2s",
+            }}
+          >
+            What&apos;s New
+          </a>
           <Link
             href="/play"
             className="btn-neon"
@@ -377,14 +389,14 @@ export default function HomePage() {
           }}
         >
           <FeatureCard
-            icon={"🌊"}
-            title="Endless Waves"
-            description="Procedurally generated enemy waves that scale with your power. No two runs are the same."
+            icon={"⚡"}
+            title="9 Abilities + 4 Evolutions"
+            description="Chain Lightning, Orbit Shield, Missile Swarm and more. Max out abilities to unlock powerful Evolutions that transform your build."
           />
           <FeatureCard
-            icon={"⚡"}
-            title="9 Unique Abilities"
-            description="Chain Lightning, Orbit Shield, Missile Swarm and more. Mix and match to create devastating builds."
+            icon={"👾"}
+            title="6 Enemy Types + Elites"
+            description="Face 6 distinct enemy types, each with dangerous Elite variants. From swarming drones to hulking tanks, every wave tests your reflexes."
           />
           <FeatureCard
             icon={"🏆"}
@@ -397,12 +409,22 @@ export default function HomePage() {
             description="Earn Void Essence from every run. Spend it on permanent upgrades to health, damage, speed, armor, and XP gain."
           />
           <FeatureCard
+            icon={"🌊"}
+            title="Wave Events"
+            description="Dynamic wave events including Swarm Rush, Tank Parade, and Speed Frenzy keep every run feeling fresh."
+          />
+          <FeatureCard
+            icon={"🎭"}
+            title="3 Characters"
+            description="Choose from 3 unique characters, each with different starting abilities and playstyles. Unlock more as you play."
+          />
+          <FeatureCard
             icon={"🌐"}
             title="Zero Downloads"
             description="Runs entirely in your browser, on any device. Jump in instantly from desktop or mobile."
           />
           <FeatureCard
-            icon={"✨"}
+            icon={"💎"}
             title="Neon Aesthetic"
             description="A visual feast of glowing geometry and particle effects. Every explosion is a light show."
           />
@@ -445,7 +467,7 @@ export default function HomePage() {
           <StepCard
             step={1}
             icon={"🎮"}
-            text="Move with WASD or virtual joystick on mobile"
+            text="Move with WASD or Arrow keys. Press SPACE to dash through danger. On mobile, use the virtual joystick."
           />
 
           {/* Arrow connector */}
@@ -463,7 +485,7 @@ export default function HomePage() {
           <StepCard
             step={2}
             icon={"💥"}
-            text="Your abilities fire automatically at nearby enemies"
+            text="Your abilities auto-attack nearby enemies. Collect XP orbs they drop to fill your level bar."
           />
 
           <div
@@ -480,7 +502,7 @@ export default function HomePage() {
           <StepCard
             step={3}
             icon={"⬆️"}
-            text="Level up and choose powerful upgrades to survive longer"
+            text="Choose upgrades between levels. Stack abilities, unlock evolutions, and survive as long as possible."
           />
         </div>
       </section>
@@ -710,6 +732,135 @@ export default function HomePage() {
             <span style={{ color: "rgba(224,224,240,0.6)", fontSize: "0.85rem" }}>
               Dash
             </span>
+          </div>
+        </div>
+      </section>
+
+      {/* ===================== What's New ===================== */}
+      <section
+        id="whats-new"
+        style={{
+          position: "relative",
+          zIndex: 10,
+          padding: "80px clamp(20px, 5vw, 60px)",
+        }}
+      >
+        <h2
+          style={{
+            textAlign: "center",
+            fontSize: "clamp(1.5rem, 4vw, 2.2rem)",
+            fontWeight: 800,
+            color: "#e0e0f0",
+            marginBottom: 48,
+            letterSpacing: "0.03em",
+          }}
+        >
+          What&apos;s New
+        </h2>
+
+        <div
+          style={{
+            maxWidth: 600,
+            margin: "0 auto",
+            display: "flex",
+            flexDirection: "column",
+            gap: 24,
+          }}
+        >
+          <div
+            className="glass"
+            style={{
+              padding: "20px 24px",
+              borderRadius: 12,
+              borderLeft: "3px solid #00f0ff",
+            }}
+          >
+            <div
+              style={{
+                fontSize: "0.75rem",
+                letterSpacing: "0.12em",
+                color: "#00f0ff",
+                fontWeight: 700,
+                marginBottom: 6,
+                textTransform: "uppercase",
+              }}
+            >
+              v0.8 &mdash; Latest
+            </div>
+            <p
+              style={{
+                fontSize: "0.95rem",
+                color: "rgba(224,224,240,0.65)",
+                lineHeight: 1.6,
+                margin: 0,
+              }}
+            >
+              Elite Enemies &amp; Wave Events. Elites bring tougher fights and bigger rewards. Dynamic wave events like Swarm Rush and Speed Frenzy keep every run unique.
+            </p>
+          </div>
+
+          <div
+            className="glass"
+            style={{
+              padding: "20px 24px",
+              borderRadius: 12,
+              borderLeft: "3px solid #aa44ff",
+            }}
+          >
+            <div
+              style={{
+                fontSize: "0.75rem",
+                letterSpacing: "0.12em",
+                color: "#aa44ff",
+                fontWeight: 700,
+                marginBottom: 6,
+                textTransform: "uppercase",
+              }}
+            >
+              v0.7
+            </div>
+            <p
+              style={{
+                fontSize: "0.95rem",
+                color: "rgba(224,224,240,0.65)",
+                lineHeight: 1.6,
+                margin: 0,
+              }}
+            >
+              Weapon Evolutions &amp; Mobile Controls. Max out abilities to unlock devastating evolved forms. Full touch controls with virtual joystick.
+            </p>
+          </div>
+
+          <div
+            className="glass"
+            style={{
+              padding: "20px 24px",
+              borderRadius: 12,
+              borderLeft: "3px solid #ff00aa",
+            }}
+          >
+            <div
+              style={{
+                fontSize: "0.75rem",
+                letterSpacing: "0.12em",
+                color: "#ff00aa",
+                fontWeight: 700,
+                marginBottom: 6,
+                textTransform: "uppercase",
+              }}
+            >
+              v0.6
+            </div>
+            <p
+              style={{
+                fontSize: "0.95rem",
+                color: "rgba(224,224,240,0.65)",
+                lineHeight: 1.6,
+                margin: 0,
+              }}
+            >
+              Meta-Progression &amp; Upgrades Shop. Earn Void Essence and spend it on permanent stat boosts that carry across runs.
+            </p>
           </div>
         </div>
       </section>
