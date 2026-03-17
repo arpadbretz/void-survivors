@@ -43,6 +43,7 @@ import { AudioManager } from './audio';
 import { loadMeta, getMetaBonuses, MetaBonuses } from './meta';
 import { getCharacter, CharacterDef } from './characters';
 import { DailyModifier, getModifierValue } from './daily';
+import { Difficulty, DifficultyConfig, getDifficultyConfig, getWaveScaling } from './difficulty';
 
 // ── Constants ───────────────────────────────────────────────────
 
@@ -93,6 +94,8 @@ interface EngineCallbacks {
     harbingerKills: number;
     nexusKills: number;
     phantomKills: number;
+    difficulty: string;
+    scoreMult: number;
   }) => void;
   onAchievementCheck?: (stats: {
     score: number;
@@ -167,6 +170,10 @@ export class GameEngine {
 
   // Daily challenge modifiers
   private dailyModifiers: DailyModifier[] = [];
+
+  // Difficulty settings
+  private difficulty: Difficulty = 'normal';
+  private difficultyConfig: DifficultyConfig = getDifficultyConfig('normal');
 
   // Meta-progression bonuses applied at game start
   private metaBonuses: MetaBonuses = {
@@ -281,6 +288,12 @@ export class GameEngine {
     this.dailyModifiers = modifiers;
   }
 
+  setDifficulty(d: Difficulty): void {
+    this.difficulty = d;
+    this.difficultyConfig = getDifficultyConfig(d);
+    this.enemyManager.setDifficultyConfig(this.difficultyConfig);
+  }
+
   setSoundEnabled(enabled: boolean): void {
     this.soundEnabled = enabled;
     if (enabled) this.audio.unmute();
@@ -388,6 +401,9 @@ export class GameEngine {
       this.state.player.health = this.state.player.maxHealth;
       this.state.player.speed *= speedMult;
     }
+
+    // Apply difficulty config to enemy manager
+    this.enemyManager.setDifficultyConfig(this.difficultyConfig);
 
     this.enemiesKilled = 0;
     this.bossesKilled = 0;
@@ -519,9 +535,11 @@ export class GameEngine {
     s.enemies.push(...newEnemies);
 
     // Check for boss spawn on milestone waves
+    const waveScaling = getWaveScaling(s.wave);
+    const activeBossCount = s.enemies.filter((e) => e.enemyType === 'boss' && e.active).length;
     if (
       shouldSpawnBoss(s.wave) &&
-      !s.enemies.some((e) => e.enemyType === 'boss' && e.active)
+      activeBossCount < waveScaling.bossCount
     ) {
       const bossEnemies = this.enemyManager.spawnWave(
         s.wave,
@@ -550,7 +568,7 @@ export class GameEngine {
     for (const enemy of s.enemies) {
       if (enemy.active && enemy._spawnedEnemies && enemy._spawnedEnemies.length > 0) {
         for (const spawnPos of enemy._spawnedEnemies) {
-          const chaser = createEnemy('chaser', spawnPos, s.wave);
+          const chaser = createEnemy('chaser', spawnPos, s.wave, this.difficultyConfig);
           chaser.spawnTime = s.time;
           s.enemies.push(chaser);
         }
@@ -636,6 +654,14 @@ export class GameEngine {
     s.enemiesKilled = this.enemiesKilled;
     s.combo = this.comboCount;
     s.comboTimer = this.comboTimer;
+
+    // Compute combo multiplier for HUD display
+    let comboMult = 1;
+    if (this.comboCount >= 100) comboMult = 5;
+    else if (this.comboCount >= 50) comboMult = 3;
+    else if (this.comboCount >= 25) comboMult = 2;
+    else if (this.comboCount >= 10) comboMult = 1.5;
+    s.comboMultiplier = comboMult;
 
     // 15. Game over
     if (s.player.health <= 0 && !s.gameOver) {
@@ -789,9 +815,9 @@ export class GameEngine {
       if (dist < p.radius + orb.radius) {
         orb.active = false;
         const dailyXpMult = getModifierValue(this.dailyModifiers, 'xp_mult');
-        const xpGain = Math.floor(orb.value * this.metaBonuses.xpMultiplier * this.characterDef.xpMultiplier * dailyXpMult);
+        const xpGain = Math.floor(orb.value * this.metaBonuses.xpMultiplier * this.characterDef.xpMultiplier * dailyXpMult * this.difficultyConfig.xpMult);
         p.xp += xpGain;
-        this.state.score += orb.value;
+        this.state.score += Math.floor(orb.value * this.difficultyConfig.scoreMult);
         this.particles.emitXPPickup(orb.pos.x, orb.pos.y);
         this.audio.playPickup();
       }
@@ -1012,7 +1038,7 @@ export class GameEngine {
 
     // Splitter: spawn mini enemies on death
     if (enemy.enemyType === 'splitter') {
-      const splits = createSplitEnemies(enemy.pos, this.state.wave);
+      const splits = createSplitEnemies(enemy.pos, this.state.wave, this.difficultyConfig);
       for (const e of splits) e.spawnTime = this.state.time;
       this.state.enemies.push(...splits);
     }
@@ -1027,25 +1053,46 @@ export class GameEngine {
       this.maxCombo = this.comboCount;
     }
 
-    // Score multiplier based on combo
+    // Score multiplier based on combo (enhanced tiers)
     let scoreMultiplier = 1;
-    if (this.comboCount >= 50) scoreMultiplier = 5;
-    else if (this.comboCount >= 20) scoreMultiplier = 3;
-    else if (this.comboCount >= 10) scoreMultiplier = 2;
-    else if (this.comboCount >= 5) scoreMultiplier = 1.5;
+    if (this.comboCount >= 100) scoreMultiplier = 5;
+    else if (this.comboCount >= 50) scoreMultiplier = 3;
+    else if (this.comboCount >= 25) scoreMultiplier = 2;
+    else if (this.comboCount >= 10) scoreMultiplier = 1.5;
 
-    this.state.score += Math.floor(enemy.xpValue * 2 * scoreMultiplier);
+    this.state.score += Math.floor(enemy.xpValue * 2 * scoreMultiplier * this.difficultyConfig.scoreMult);
 
-    // Combo milestone effects
-    const milestones = [5, 10, 20, 50];
-    if (milestones.includes(this.comboCount)) {
-      this.particles.emitExplosion(
-        this.state.player.pos.x,
-        this.state.player.pos.y,
-        '#ffdd00',
-        20
-      );
-      this.audio.playLevelUp();
+    // Combo milestone effects with scaled particle bursts
+    const comboMilestones: [number, number, number][] = [
+      [100, 60, 1.5],  // [threshold, particles, lifetime multiplier]
+      [50, 40, 1.2],
+      [25, 25, 1.0],
+      [10, 15, 1.0],
+      [5, 10, 1.0],
+    ];
+    for (const [threshold, particleCount, lifeMult] of comboMilestones) {
+      if (this.comboCount === threshold) {
+        // Gold particle burst from player
+        for (let i = 0; i < particleCount; i++) {
+          const angle = (Math.PI * 2 * i) / particleCount + Math.random() * 0.3;
+          const speed = 60 + Math.random() * 180;
+          const px = this.state.player.pos.x;
+          const py = this.state.player.pos.y;
+          this.particles.emitExplosion(
+            px + Math.cos(angle) * 5,
+            py + Math.sin(angle) * 5,
+            threshold >= 50 ? '#ffd700' : '#ffdd00',
+            1
+          );
+        }
+        // Play combo milestone sound
+        this.audio.playComboMilestone(threshold);
+        break;
+      }
+    }
+    // Legacy small milestone at combo 5 (keep existing chime)
+    if (this.comboCount === 5) {
+      this.audio.playPickup();
     }
 
     this.particles.emitExplosion(enemy.pos.x, enemy.pos.y, enemy.color, 15);
@@ -1484,6 +1531,8 @@ export class GameEngine {
         harbingerKills: this.harbingerKills,
         nexusKills: this.nexusKills,
         phantomKills: this.phantomKillsThisRun,
+        difficulty: this.difficultyConfig.name,
+        scoreMult: this.difficultyConfig.scoreMult,
       });
     }
   }

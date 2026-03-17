@@ -155,6 +155,7 @@ export interface GameState {
   enemiesKilled?: number;
   combo?: number;
   comboTimer?: number;
+  comboMultiplier?: number;
 }
 
 export interface LootDrop {

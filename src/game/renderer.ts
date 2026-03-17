@@ -1389,41 +1389,111 @@ export class Renderer {
       this.drawFpsCounter();
     }
 
-    // Combo counter
+    // Combo counter (enhanced with milestone visuals)
     const combo = state.combo ?? 0;
     if (combo >= 2) {
       const comboTimer = state.comboTimer ?? 0;
+      const comboMultiplier = state.comboMultiplier ?? 1;
 
       // Color scales with combo
       let comboColor: string;
-      if (combo >= 50) comboColor = '#ff00ff';
-      else if (combo >= 20) comboColor = '#ff3344';
+      if (combo >= 100) comboColor = '#ffd700';
+      else if (combo >= 50) comboColor = '#ff00ff';
+      else if (combo >= 25) comboColor = '#ff3344';
       else if (combo >= 10) comboColor = '#ff8800';
       else if (combo >= 5) comboColor = '#ffdd00';
       else comboColor = '#ffffff';
 
       // Size scales with combo
       let fontSize: number;
-      if (combo >= 50) fontSize = 28;
-      else if (combo >= 20) fontSize = 24;
+      if (combo >= 100) fontSize = 32;
+      else if (combo >= 50) fontSize = 28;
+      else if (combo >= 25) fontSize = 24;
       else if (combo >= 10) fontSize = 20;
       else if (combo >= 5) fontSize = 18;
       else fontSize = 16;
 
-      // Pulsing scale effect
-      const pulse = 1 + Math.sin(Date.now() * 0.01) * 0.08;
+      // Pulsing scale effect — stronger breathing at 25+
+      let pulse: number;
+      if (combo >= 25) {
+        pulse = 1 + Math.sin(Date.now() * 0.006) * 0.15;
+      } else {
+        pulse = 1 + Math.sin(Date.now() * 0.01) * 0.08;
+      }
       const scaledSize = Math.round(fontSize * pulse);
+
+      // Fade out as timer runs low
+      const alpha = comboTimer > 0.5 ? 1 : Math.max(0, comboTimer / 0.5);
+
+      // Golden screen tint at combo 10+
+      if (combo >= 10 && alpha > 0) {
+        ctx.save();
+        const tintAlpha = combo >= 100 ? 0.05 : combo >= 50 ? 0.035 : 0.02;
+        ctx.fillStyle = `rgba(255, 215, 0, ${tintAlpha * alpha})`;
+        ctx.fillRect(0, 0, this.width, this.height);
+        ctx.restore();
+      }
+
+      // Golden glow border at combo 100+
+      if (combo >= 100 && alpha > 0) {
+        ctx.save();
+        const borderPulse = 0.5 + Math.sin(Date.now() * 0.004) * 0.5;
+        const borderAlpha = 0.12 * borderPulse * alpha;
+        const borderWidth = 6;
+
+        ctx.fillStyle = `rgba(255, 215, 0, ${borderAlpha})`;
+        // Top
+        ctx.fillRect(0, 0, this.width, borderWidth);
+        // Bottom
+        ctx.fillRect(0, this.height - borderWidth, this.width, borderWidth);
+        // Left
+        ctx.fillRect(0, 0, borderWidth, this.height);
+        // Right
+        ctx.fillRect(this.width - borderWidth, 0, borderWidth, this.height);
+
+        // Softer inner border
+        const innerAlpha = borderAlpha * 0.4;
+        ctx.fillStyle = `rgba(255, 215, 0, ${innerAlpha})`;
+        ctx.fillRect(borderWidth, borderWidth, this.width - borderWidth * 2, 3);
+        ctx.fillRect(borderWidth, this.height - borderWidth - 3, this.width - borderWidth * 2, 3);
+        ctx.fillRect(borderWidth, borderWidth, 3, this.height - borderWidth * 2);
+        ctx.fillRect(this.width - borderWidth - 3, borderWidth, 3, this.height - borderWidth * 2);
+        ctx.restore();
+      }
 
       ctx.save();
       ctx.textAlign = 'center';
       ctx.font = `bold ${scaledSize}px monospace`;
       ctx.fillStyle = comboColor;
-
-      // Fade out as timer runs low
-      const alpha = comboTimer > 0.5 ? 1 : Math.max(0, comboTimer / 0.5);
       ctx.globalAlpha = alpha;
 
+      // Main combo text
       ctx.fillText(`COMBO x${combo}`, this.width / 2, 80);
+
+      // Multiplier display when > 1x
+      if (comboMultiplier > 1) {
+        ctx.font = `bold ${Math.round(scaledSize * 0.55)}px monospace`;
+        ctx.fillStyle = '#ffd700';
+        ctx.fillText(`${comboMultiplier}x SCORE`, this.width / 2, 80 + scaledSize * 0.7);
+      }
+
+      // Milestone title text
+      let milestoneText = '';
+      if (combo >= 100) {
+        milestoneText = 'GODLIKE';
+      } else if (combo >= 50) {
+        milestoneText = 'UNSTOPPABLE';
+      }
+
+      if (milestoneText) {
+        const milePulse = 1 + Math.sin(Date.now() * 0.005) * 0.1;
+        const mileSize = Math.round((combo >= 100 ? 22 : 18) * milePulse);
+        ctx.font = `bold ${mileSize}px monospace`;
+        ctx.fillStyle = '#ffd700';
+        const mileY = 80 + scaledSize * 0.7 + (comboMultiplier > 1 ? mileSize + 4 : 0);
+        ctx.fillText(milestoneText, this.width / 2, mileY);
+      }
+
       ctx.globalAlpha = 1;
       ctx.restore();
     }

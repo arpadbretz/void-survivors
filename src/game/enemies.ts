@@ -22,6 +22,12 @@ import {
   randomRange,
   randomOnCircle,
 } from './math';
+import {
+  DifficultyConfig,
+  getWaveScaling,
+  getDifficultyConfig,
+  type Difficulty,
+} from './difficulty';
 
 let nextEnemyId = 0;
 
@@ -39,16 +45,21 @@ const WAVE_CONFIGS: WaveConfig[] = [
   { enemyTypes: ['chaser', 'swarm', 'shooter', 'tank', 'splitter', 'phantom'], spawnRate: 1.0, maxEnemies: 40, duration: 30 },
 ];
 
-export function getWaveConfig(wave: number): WaveConfig {
+export function getWaveConfig(wave: number, difficultyConfig?: DifficultyConfig): WaveConfig {
   const idx = Math.min(wave - 1, WAVE_CONFIGS.length - 1);
   const base = WAVE_CONFIGS[idx];
 
   // Continuously scale after defined waves
   const extraScale = Math.max(0, wave - WAVE_CONFIGS.length);
+
+  // Apply endless wave scaling for spawn rate
+  const waveScaling = getWaveScaling(wave);
+  const spawnRateMult = difficultyConfig?.spawnRateMult ?? 1;
+
   return {
     enemyTypes: base.enemyTypes,
-    spawnRate: Math.max(0.3, base.spawnRate - extraScale * 0.05),
-    maxEnemies: base.maxEnemies + extraScale * 5,
+    spawnRate: Math.max(0.2, (base.spawnRate - extraScale * 0.05) / (waveScaling.spawnRateScale * spawnRateMult)),
+    maxEnemies: Math.floor((base.maxEnemies + extraScale * 5) * waveScaling.spawnRateScale),
     duration: base.duration,
   };
 }
@@ -70,10 +81,22 @@ function getBossVariant(wave: number): 'titan' | 'harbinger' | 'nexus' {
 export function createEnemy(
   type: EnemyType,
   pos: Vector2,
-  wave: number
+  wave: number,
+  difficultyConfig?: DifficultyConfig
 ): Enemy {
-  const scaleHP = 1 + (wave - 1) * 0.1;
-  const scaleDmg = 1 + (wave - 1) * 0.1;
+  const waveScaling = getWaveScaling(wave);
+  const baseScaleHP = 1 + (wave - 1) * 0.1;
+  const baseScaleDmg = 1 + (wave - 1) * 0.1;
+
+  const isBoss = type === 'boss';
+  const hpMult = isBoss
+    ? (difficultyConfig?.bossHealthMult ?? 1) * waveScaling.bossHpScale
+    : (difficultyConfig?.enemyHealthMult ?? 1) * waveScaling.hpScale;
+  const dmgMult = difficultyConfig?.enemyDamageMult ?? 1;
+  const spdMult = (difficultyConfig?.enemySpeedMult ?? 1) * waveScaling.speedScale;
+
+  const scaleHP = baseScaleHP * hpMult;
+  const scaleDmg = baseScaleDmg * dmgMult;
 
   const base = {
     id: genId(),
@@ -95,7 +118,7 @@ export function createEnemy(
         radius: 12,
         health: Math.round(30 * scaleHP),
         maxHealth: Math.round(30 * scaleHP),
-        speed: 120,
+        speed: Math.round(120 * spdMult),
         damage: Math.round(10 * scaleDmg),
         xpValue: 10,
         color: '#ff3344',
@@ -109,7 +132,7 @@ export function createEnemy(
         radius: 14,
         health: Math.round(50 * scaleHP),
         maxHealth: Math.round(50 * scaleHP),
-        speed: 60,
+        speed: Math.round(60 * spdMult),
         damage: Math.round(8 * scaleDmg),
         xpValue: 20,
         color: '#ff8800',
@@ -125,7 +148,7 @@ export function createEnemy(
         radius: 8,
         health: Math.round(15 * scaleHP),
         maxHealth: Math.round(15 * scaleHP),
-        speed: 150,
+        speed: Math.round(150 * spdMult),
         damage: Math.round(5 * scaleDmg),
         xpValue: 5,
         color: '#ff44aa',
@@ -139,7 +162,7 @@ export function createEnemy(
         radius: 22,
         health: Math.round(200 * scaleHP),
         maxHealth: Math.round(200 * scaleHP),
-        speed: 40,
+        speed: Math.round(40 * spdMult),
         damage: Math.round(25 * scaleDmg),
         xpValue: 50,
         color: '#aa44ff',
@@ -153,7 +176,7 @@ export function createEnemy(
         radius: 18,
         health: Math.round(60 * scaleHP),
         maxHealth: Math.round(60 * scaleHP),
-        speed: 80,
+        speed: Math.round(80 * spdMult),
         damage: Math.round(12 * scaleDmg),
         xpValue: 25,
         color: '#22dd88',
@@ -167,7 +190,7 @@ export function createEnemy(
         radius: 14,
         health: Math.round(40 * scaleHP),
         maxHealth: Math.round(40 * scaleHP),
-        speed: 100,
+        speed: Math.round(100 * spdMult),
         damage: Math.round(12 * scaleDmg),
         xpValue: 20,
         color: '#aa44ff',
@@ -186,7 +209,7 @@ export function createEnemy(
             radius: 40,
             health: Math.round(800 * scaleHP),
             maxHealth: Math.round(800 * scaleHP),
-            speed: 40,
+            speed: Math.round(40 * spdMult),
             damage: Math.round(25 * scaleDmg),
             xpValue: 200,
             color: '#ff4444',
@@ -200,7 +223,7 @@ export function createEnemy(
             radius: 30,
             health: Math.round(600 * scaleHP),
             maxHealth: Math.round(600 * scaleHP),
-            speed: 70,
+            speed: Math.round(70 * spdMult),
             damage: Math.round(15 * scaleDmg),
             xpValue: 250,
             color: '#ff8800',
@@ -231,13 +254,17 @@ export function createEnemy(
   }
 }
 
-export function createSplitEnemies(pos: Vector2, wave: number): Enemy[] {
+export function createSplitEnemies(pos: Vector2, wave: number, difficultyConfig?: DifficultyConfig): Enemy[] {
   const results: Enemy[] = [];
+  const waveScaling = getWaveScaling(wave);
+  const hpMult = (difficultyConfig?.enemyHealthMult ?? 1) * waveScaling.hpScale;
+  const dmgMult = difficultyConfig?.enemyDamageMult ?? 1;
+  const spdMult = (difficultyConfig?.enemySpeedMult ?? 1) * waveScaling.speedScale;
   for (let i = 0; i < 2; i++) {
     const offset = { x: (Math.random() - 0.5) * 30, y: (Math.random() - 0.5) * 30 };
     const splitPos = { x: pos.x + offset.x, y: pos.y + offset.y };
-    const scaleHP = 1 + (wave - 1) * 0.1;
-    const scaleDmg = 1 + (wave - 1) * 0.1;
+    const scaleHP = (1 + (wave - 1) * 0.1) * hpMult;
+    const scaleDmg = (1 + (wave - 1) * 0.1) * dmgMult;
     results.push({
       id: genId(),
       pos: splitPos,
@@ -245,7 +272,7 @@ export function createSplitEnemies(pos: Vector2, wave: number): Enemy[] {
       radius: 10,
       health: Math.round(20 * scaleHP),
       maxHealth: Math.round(20 * scaleHP),
-      speed: 140,
+      speed: Math.round(140 * spdMult),
       damage: Math.round(6 * scaleDmg),
       xpValue: 8,
       color: '#22dd88',
@@ -280,6 +307,7 @@ export function makeElite(enemy: Enemy): Enemy {
 
 export class EnemyManager {
   private spawnTimer: number = 0;
+  difficultyConfig: DifficultyConfig | undefined;
 
   // Wave event overrides
   private swarmRushActive: boolean = false;
@@ -287,21 +315,28 @@ export class EnemyManager {
   private forceEnemyType: EnemyType | null = null;
   waveSpeedMultiplier: number = 1;
 
+  setDifficultyConfig(config: DifficultyConfig): void {
+    this.difficultyConfig = config;
+  }
+
   spawnWave(
     wave: number,
     playerPos: Vector2,
     worldSize: number,
     currentEnemies: Enemy[]
   ): Enemy[] {
-    const config = getWaveConfig(wave);
     const newEnemies: Enemy[] = [];
 
     // Boss on milestone waves
     if (shouldSpawnBoss(wave)) {
-      const spawnPos = add(playerPos, randomOnCircle(600));
-      spawnPos.x = Math.max(50, Math.min(worldSize - 50, spawnPos.x));
-      spawnPos.y = Math.max(50, Math.min(worldSize - 50, spawnPos.y));
-      newEnemies.push(createEnemy('boss', spawnPos, wave));
+      const waveScaling = getWaveScaling(wave);
+      const bossCount = waveScaling.bossCount;
+      for (let b = 0; b < bossCount; b++) {
+        const spawnPos = add(playerPos, randomOnCircle(600));
+        spawnPos.x = Math.max(50, Math.min(worldSize - 50, spawnPos.x));
+        spawnPos.y = Math.max(50, Math.min(worldSize - 50, spawnPos.y));
+        newEnemies.push(createEnemy('boss', spawnPos, wave, this.difficultyConfig));
+      }
     }
 
     return newEnemies;
@@ -314,13 +349,15 @@ export class EnemyManager {
     worldSize: number
   ): Enemy[] {
     const tanks: Enemy[] = [];
+    const waveScaling = getWaveScaling(wave);
     for (let i = 0; i < 3; i++) {
       const spawnPos = add(playerPos, randomOnCircle(randomRange(400, 700)));
       spawnPos.x = Math.max(50, Math.min(worldSize - 50, spawnPos.x));
       spawnPos.y = Math.max(50, Math.min(worldSize - 50, spawnPos.y));
-      const tank = createEnemy('tank', spawnPos, wave);
+      const tank = createEnemy('tank', spawnPos, wave, this.difficultyConfig);
       // Roll elite chance for tanks too
-      const eliteChance = Math.min(25, wave * 1.5) / 100;
+      const baseEliteChance = Math.min(25, wave * 1.5) / 100;
+      const eliteChance = Math.max(baseEliteChance * (this.difficultyConfig?.eliteChanceMult ?? 1), waveScaling.minEliteChance);
       if (Math.random() < eliteChance) {
         makeElite(tank);
       }
@@ -348,8 +385,9 @@ export class EnemyManager {
     worldSize: number,
     currentEnemies: Enemy[]
   ): Enemy[] {
-    const config = getWaveConfig(wave);
+    const config = getWaveConfig(wave, this.difficultyConfig);
     const spawned: Enemy[] = [];
+    const waveScaling = getWaveScaling(wave);
 
     // Update swarm rush timer
     if (this.swarmRushActive) {
@@ -381,10 +419,11 @@ export class EnemyManager {
       spawnPos.x = Math.max(50, Math.min(worldSize - 50, spawnPos.x));
       spawnPos.y = Math.max(50, Math.min(worldSize - 50, spawnPos.y));
 
-      const enemy = createEnemy(type, spawnPos, wave);
+      const enemy = createEnemy(type, spawnPos, wave, this.difficultyConfig);
 
-      // Roll elite chance: wave * 1.5%, capped at 25%
-      const eliteChance = Math.min(25, wave * 1.5) / 100;
+      // Roll elite chance: wave * 1.5%, capped at 25%, with difficulty and wave scaling
+      const baseEliteChance = Math.min(25, wave * 1.5) / 100;
+      const eliteChance = Math.max(baseEliteChance * (this.difficultyConfig?.eliteChanceMult ?? 1), waveScaling.minEliteChance);
       if (Math.random() < eliteChance) {
         makeElite(enemy);
       }
@@ -396,7 +435,7 @@ export class EnemyManager {
         for (let i = 0; i < 4; i++) {
           const offset = { x: randomRange(-30, 30), y: randomRange(-30, 30) };
           const sPos = add(spawnPos, offset);
-          const swarmEnemy = createEnemy('swarm', sPos, wave);
+          const swarmEnemy = createEnemy('swarm', sPos, wave, this.difficultyConfig);
           if (Math.random() < eliteChance) {
             makeElite(swarmEnemy);
           }

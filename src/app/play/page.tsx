@@ -34,6 +34,8 @@ interface GameOverStats {
   harbingerKills: number;
   nexusKills: number;
   phantomKills: number;
+  difficulty: string;
+  scoreMult: number;
 }
 
 interface AchievementToast {
@@ -107,6 +109,7 @@ interface GameEngineInterface {
   applyDisplaySettings: (settings: { showFps: boolean; showMinimap: boolean; screenShake: boolean; tutorialHints: boolean }) => void;
   setCharacter: (characterId: string) => void;
   setDailyModifiers: (modifiers: import("@/game/daily").DailyModifier[]) => void;
+  setDifficulty: (difficulty: import("@/game/difficulty").Difficulty) => void;
   startAttractMode: (canvas: HTMLCanvasElement) => void;
   stopAttractMode: () => void;
 }
@@ -198,6 +201,10 @@ export default function PlayPage() {
   const [dailyResult, setDailyResult] = useState<import("@/game/daily").DailyResult | null>(null);
   const [isDailyMode, setIsDailyMode] = useState(false);
 
+  // Difficulty state
+  const [selectedDifficulty, setSelectedDifficulty] = useState<import("@/game/difficulty").Difficulty>("normal");
+  const [difficultyConfigs, setDifficultyConfigs] = useState<Record<string, import("@/game/difficulty").DifficultyConfig> | null>(null);
+
   // PWA install prompt state
   const deferredPromptRef = useRef<Event | null>(null);
   const [showInstallBtn, setShowInstallBtn] = useState(false);
@@ -247,6 +254,12 @@ export default function PlayPage() {
     import("@/game/daily").then((dailyMod) => {
       setDailyChallenge(dailyMod.getTodaysChallenge());
       setDailyResult(dailyMod.loadDailyResult());
+    });
+
+    // Load difficulty
+    import("@/game/difficulty").then((diffMod) => {
+      setSelectedDifficulty(diffMod.loadDifficulty());
+      setDifficultyConfigs(diffMod.DIFFICULTY_CONFIGS);
     });
 
     // Load settings
@@ -584,6 +597,7 @@ export default function PlayPage() {
     if (!canvasRef.current || !engineRef.current) return;
     engineRef.current.stopAttractMode();
     engineRef.current.setCharacter(selectedCharacter);
+    engineRef.current.setDifficulty(selectedDifficulty);
     engineRef.current.setDailyModifiers([]);
     setIsDailyMode(false);
     engineRef.current.start(canvasRef.current, {
@@ -595,7 +609,7 @@ export default function PlayPage() {
     engineRef.current.setSoundEnabled(soundEnabled);
     engineRef.current.applyDisplaySettings(gameSettings);
     setScreen("playing");
-  }, [handleStateChange, handleLevelUp, handleGameOver, handleAchievementCheck, soundEnabled, selectedCharacter, gameSettings]);
+  }, [handleStateChange, handleLevelUp, handleGameOver, handleAchievementCheck, soundEnabled, selectedCharacter, selectedDifficulty, gameSettings]);
 
   // -----------------------------------------------------------------------
   // Start daily challenge
@@ -635,6 +649,7 @@ export default function PlayPage() {
   const restartGame = useCallback(() => {
     engineRef.current?.restart();
     engineRef.current?.setCharacter(selectedCharacter);
+    engineRef.current?.setDifficulty(selectedDifficulty);
     engineRef.current?.setDailyModifiers([]);
     setIsDailyMode(false);
     engineRef.current?.start(canvasRef.current!, {
@@ -645,7 +660,7 @@ export default function PlayPage() {
     });
     engineRef.current?.applyDisplaySettings(gameSettings);
     setScreen("playing");
-  }, [handleStateChange, handleLevelUp, handleGameOver, handleAchievementCheck, selectedCharacter, gameSettings]);
+  }, [handleStateChange, handleLevelUp, handleGameOver, handleAchievementCheck, selectedCharacter, selectedDifficulty, gameSettings]);
 
   const resumeGame = useCallback(() => {
     engineRef.current?.resume();
@@ -887,10 +902,60 @@ export default function PlayPage() {
               Survive the void. Become the weapon.
             </p>
 
+            {/* Difficulty Selector */}
+            {difficultyConfigs && (
+              <div style={{ marginTop: 32, display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
+                {(["easy", "normal", "hard", "nightmare"] as const).map((diff) => {
+                  const cfg = difficultyConfigs[diff];
+                  if (!cfg) return null;
+                  const isSelected = selectedDifficulty === diff;
+                  return (
+                    <button
+                      key={diff}
+                      onClick={() => {
+                        setSelectedDifficulty(diff);
+                        import("@/game/difficulty").then((m) => m.saveDifficulty(diff));
+                      }}
+                      style={{
+                        padding: "8px 14px",
+                        borderRadius: 8,
+                        border: `1px solid ${isSelected ? cfg.color : "rgba(224,224,240,0.2)"}`,
+                        background: isSelected
+                          ? `linear-gradient(135deg, ${cfg.color}22, ${cfg.color}11)`
+                          : "rgba(10,10,18,0.6)",
+                        color: isSelected ? cfg.color : "rgba(224,224,240,0.5)",
+                        cursor: "pointer",
+                        fontSize: "0.75rem",
+                        fontFamily: "var(--font-geist-mono), monospace",
+                        letterSpacing: "0.08em",
+                        transition: "all 0.2s",
+                        textAlign: "center",
+                        minWidth: 80,
+                        boxShadow: isSelected ? `0 0 12px ${cfg.color}44, inset 0 0 8px ${cfg.color}22` : "none",
+                        textShadow: isSelected ? `0 0 8px ${cfg.color}66` : "none",
+                      }}
+                    >
+                      <div style={{ fontWeight: 700, fontSize: "0.85rem", marginBottom: 2 }}>
+                        {cfg.name}
+                      </div>
+                      <div style={{ fontSize: "0.6rem", opacity: 0.7 }}>
+                        {cfg.description}
+                      </div>
+                      {cfg.scoreMult !== 1 && (
+                        <div style={{ fontSize: "0.6rem", marginTop: 2, color: cfg.color, opacity: 0.8 }}>
+                          {cfg.scoreMult}x score
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
             <button
               onClick={startGame}
               className="btn-neon-filled animate-pulse-glow"
-              style={{ marginTop: 40, fontSize: "1.4rem", padding: "18px 64px" }}
+              style={{ marginTop: 20, fontSize: "1.4rem", padding: "18px 64px" }}
             >
               PLAY
             </button>
@@ -3160,6 +3225,36 @@ export default function PlayPage() {
             >
               GAME OVER
             </h2>
+
+            {/* Difficulty badge */}
+            {gameOverStats.difficulty && gameOverStats.difficulty !== "Normal" && (
+              <div
+                style={{
+                  marginBottom: 16,
+                  fontSize: "0.85rem",
+                  fontFamily: "var(--font-geist-mono), monospace",
+                  letterSpacing: "0.12em",
+                  fontWeight: 700,
+                  color: gameOverStats.difficulty === "Easy" ? "#00ff88"
+                    : gameOverStats.difficulty === "Hard" ? "#ff8800"
+                    : gameOverStats.difficulty === "Nightmare" ? "#ff2244"
+                    : "#00f0ff",
+                  textShadow: `0 0 10px ${
+                    gameOverStats.difficulty === "Easy" ? "rgba(0,255,136,0.4)"
+                    : gameOverStats.difficulty === "Hard" ? "rgba(255,136,0,0.4)"
+                    : gameOverStats.difficulty === "Nightmare" ? "rgba(255,34,68,0.4)"
+                    : "rgba(0,240,255,0.4)"
+                  }`,
+                }}
+              >
+                {gameOverStats.difficulty.toUpperCase()} MODE
+                {gameOverStats.scoreMult !== 1 && (
+                  <span style={{ marginLeft: 8, fontSize: "0.75rem", opacity: 0.7 }}>
+                    ({gameOverStats.scoreMult}x score)
+                  </span>
+                )}
+              </div>
+            )}
 
             <div
               className="glass"

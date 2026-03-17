@@ -303,6 +303,80 @@ export class AudioManager {
     shimmer.stop(t + 0.8);
   }
 
+  playComboMilestone(combo: number): void {
+    this.ensureContext();
+    if (!this.ctx || !this.sfxOutput || this.muted) return;
+
+    const t = this.ctx.currentTime;
+
+    let notes: number[];
+    let noteSpacing: number;
+    let volume: number;
+    let noteDuration: number;
+
+    if (combo >= 100) {
+      // Big 5-note triumphant chord
+      notes = [523, 659, 784, 1047, 1319]; // C5 E5 G5 C6 E6
+      noteSpacing = 0.07;
+      volume = 0.2;
+      noteDuration = 0.6;
+    } else if (combo >= 50) {
+      // 4-note fanfare
+      notes = [587, 740, 880, 1175]; // D5 F#5 A5 D6
+      noteSpacing = 0.08;
+      volume = 0.18;
+      noteDuration = 0.45;
+    } else if (combo >= 25) {
+      // 3-note ascending arpeggio
+      notes = [659, 831, 988]; // E5 G#5 B5
+      noteSpacing = 0.09;
+      volume = 0.15;
+      noteDuration = 0.35;
+    } else if (combo >= 10) {
+      // Quick ascending 2-note chime
+      notes = [784, 1047]; // G5 C6
+      noteSpacing = 0.08;
+      volume = 0.13;
+      noteDuration = 0.25;
+    } else {
+      return;
+    }
+
+    notes.forEach((freq, i) => {
+      const osc = this.ctx!.createOscillator();
+      const gain = this.ctx!.createGain();
+      const start = t + i * noteSpacing;
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, start);
+
+      gain.gain.setValueAtTime(0, start);
+      gain.gain.linearRampToValueAtTime(volume, start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + noteDuration);
+
+      osc.connect(gain);
+      gain.connect(this.sfxOutput!);
+      osc.start(start);
+      osc.stop(start + noteDuration);
+    });
+
+    // For combo 100+, add a shimmer overtone
+    if (combo >= 100) {
+      const shimmer = this.ctx.createOscillator();
+      const shimmerGain = this.ctx.createGain();
+      const shimmerStart = t + notes.length * 0.07;
+      shimmer.type = 'sine';
+      shimmer.frequency.setValueAtTime(2637, shimmerStart); // E7
+      shimmerGain.gain.setValueAtTime(0, shimmerStart);
+      shimmerGain.gain.linearRampToValueAtTime(0.07, shimmerStart + 0.04);
+      shimmerGain.gain.exponentialRampToValueAtTime(0.001, shimmerStart + 0.8);
+      shimmer.connect(shimmerGain);
+      shimmerGain.connect(this.sfxOutput);
+      shimmer.start(shimmerStart);
+      shimmer.stop(shimmerStart + 0.8);
+    }
+  }
+
   playGameOver(): void {
     this.ensureContext();
     if (!this.ctx || !this.sfxOutput || this.muted) return;
