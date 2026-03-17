@@ -262,6 +262,15 @@ export class GameEngine {
     else this.audio.mute();
   }
 
+  applyDisplaySettings(settings: { showFps: boolean; showMinimap: boolean; screenShake: boolean; tutorialHints: boolean }): void {
+    if (this.renderer) {
+      this.renderer.showFps = settings.showFps;
+      this.renderer.showMinimap = settings.showMinimap;
+      this.renderer.screenShakeEnabled = settings.screenShake;
+      this.renderer.tutorialHintsEnabled = settings.tutorialHints;
+    }
+  }
+
   startAttractMode(canvas: HTMLCanvasElement): void {
     this.canvas = canvas;
     this.running = true;
@@ -503,6 +512,26 @@ export class GameEngine {
     const enemyProj = updateEnemies(s.enemies, s.player, dt, s.time, this.enemyManager.waveSpeedMultiplier);
     s.projectiles.push(...enemyProj);
 
+    // 4b. Gravity well effects: pull enemies and deal tick damage
+    for (const proj of s.projectiles) {
+      if (!proj.active || !proj.isGravityWell) continue;
+      for (const enemy of s.enemies) {
+        if (!enemy.active) continue;
+        const dist = distance(enemy.pos, proj.pos);
+        if (dist < proj.radius) {
+          const dirToWell = normalize(sub(proj.pos, enemy.pos));
+          const pullStrength = 200 * (1 - dist / proj.radius);
+          enemy.vel.x += dirToWell.x * pullStrength * dt;
+          enemy.vel.y += dirToWell.y * pullStrength * dt;
+          // Tick damage
+          enemy.health -= proj.damage * dt;
+          if (enemy.health <= 0) {
+            this.killEnemy(enemy);
+          }
+        }
+      }
+    }
+
     // 5. Update projectiles
     this.updateProjectiles(dt);
 
@@ -525,12 +554,13 @@ export class GameEngine {
     this.updateCamera(dt);
 
     // 12. Screen shake decay
-    if (s.screenShake > 0) {
+    if (s.screenShake > 0 && this.renderer?.screenShakeEnabled !== false) {
       s.screenShake *= 0.9;
       if (s.screenShake < 0.1) s.screenShake = 0;
       s.camera.shakeX = (Math.random() - 0.5) * s.screenShake;
       s.camera.shakeY = (Math.random() - 0.5) * s.screenShake;
     } else {
+      s.screenShake = 0;
       s.camera.shakeX = 0;
       s.camera.shakeY = 0;
     }
@@ -714,9 +744,20 @@ export class GameEngine {
     // Player projectiles vs enemies
     for (const proj of s.projectiles) {
       if (!proj.active || proj.owner !== 'player') continue;
+      // Gravity wells handle damage via tick system, skip normal collisions
+      if (proj.isGravityWell) continue;
 
       for (const enemy of s.enemies) {
         if (!enemy.active) continue;
+
+        // Skip damage to phantoms in invisible/fading_out states (they are phased out)
+        if (
+          enemy.enemyType === 'phantom' &&
+          enemy.phaseState !== 'visible' &&
+          enemy.phaseState !== 'fading_in'
+        ) {
+          continue;
+        }
 
         const dist = distance(proj.pos, enemy.pos);
         if (dist < proj.radius + enemy.radius) {

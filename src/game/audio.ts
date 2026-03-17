@@ -6,8 +6,10 @@ export class AudioManager {
   private static instance: AudioManager;
   private ctx: AudioContext | null = null;
   private masterGain: GainNode | null = null;
+  private sfxGain: GainNode | null = null;
   private muted: boolean = false;
   private volume: number = 0.3;
+  private sfxVolume: number = 1.0;
 
   // ── Music State ──────────────────────────────────────────────
   private musicGain: GainNode | null = null;
@@ -56,6 +58,11 @@ export class AudioManager {
     this.masterGain = this.ctx.createGain();
     this.masterGain.gain.value = this.volume;
     this.masterGain.connect(this.ctx.destination);
+
+    // SFX gain node sits between individual SFX and masterGain
+    this.sfxGain = this.ctx.createGain();
+    this.sfxGain.gain.value = this.sfxVolume;
+    this.sfxGain.connect(this.masterGain);
   }
 
   private ensureContext(): void {
@@ -66,9 +73,13 @@ export class AudioManager {
 
   // ── Sound Effects ─────────────────────────────────────────────
 
+  private get sfxOutput(): GainNode | null {
+    return this.sfxGain || this.masterGain;
+  }
+
   playShoot(): void {
     this.ensureContext();
-    if (!this.ctx || !this.masterGain || this.muted) return;
+    if (!this.ctx || !this.sfxOutput || this.muted) return;
 
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
@@ -82,14 +93,14 @@ export class AudioManager {
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
 
     osc.connect(gain);
-    gain.connect(this.masterGain);
+    gain.connect(this.sfxOutput);
     osc.start(t);
     osc.stop(t + 0.1);
   }
 
   playHit(): void {
     this.ensureContext();
-    if (!this.ctx || !this.masterGain || this.muted) return;
+    if (!this.ctx || !this.sfxOutput || this.muted) return;
 
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
@@ -103,14 +114,14 @@ export class AudioManager {
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
 
     osc.connect(gain);
-    gain.connect(this.masterGain);
+    gain.connect(this.sfxOutput);
     osc.start(t);
     osc.stop(t + 0.12);
   }
 
   playExplosion(): void {
     this.ensureContext();
-    if (!this.ctx || !this.masterGain || this.muted) return;
+    if (!this.ctx || !this.sfxOutput || this.muted) return;
 
     const t = this.ctx.currentTime;
 
@@ -123,7 +134,7 @@ export class AudioManager {
     gain.gain.setValueAtTime(0.3, t);
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
     osc.connect(gain);
-    gain.connect(this.masterGain);
+    gain.connect(this.sfxOutput);
     osc.start(t);
     osc.stop(t + 0.5);
 
@@ -140,13 +151,13 @@ export class AudioManager {
     noiseGain.gain.setValueAtTime(0.25, t);
     noiseGain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
     noise.connect(noiseGain);
-    noiseGain.connect(this.masterGain);
+    noiseGain.connect(this.sfxOutput);
     noise.start(t);
   }
 
   playPickup(): void {
     this.ensureContext();
-    if (!this.ctx || !this.masterGain || this.muted) return;
+    if (!this.ctx || !this.sfxOutput || this.muted) return;
 
     const t = this.ctx.currentTime;
 
@@ -161,14 +172,14 @@ export class AudioManager {
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
 
     osc.connect(gain);
-    gain.connect(this.masterGain);
+    gain.connect(this.sfxOutput);
     osc.start(t);
     osc.stop(t + 0.15);
   }
 
   playLevelUp(): void {
     this.ensureContext();
-    if (!this.ctx || !this.masterGain || this.muted) return;
+    if (!this.ctx || !this.sfxOutput || this.muted) return;
 
     const t = this.ctx.currentTime;
     const notes = [523, 659, 784, 1047]; // C5 E5 G5 C6
@@ -186,7 +197,7 @@ export class AudioManager {
       gain.gain.exponentialRampToValueAtTime(0.001, start + 0.3);
 
       osc.connect(gain);
-      gain.connect(this.masterGain!);
+      gain.connect(this.sfxOutput!);
       osc.start(start);
       osc.stop(start + 0.3);
     });
@@ -194,7 +205,7 @@ export class AudioManager {
 
   playDamage(): void {
     this.ensureContext();
-    if (!this.ctx || !this.masterGain || this.muted) return;
+    if (!this.ctx || !this.sfxOutput || this.muted) return;
 
     const t = this.ctx.currentTime;
 
@@ -208,14 +219,14 @@ export class AudioManager {
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
 
     osc.connect(gain);
-    gain.connect(this.masterGain);
+    gain.connect(this.sfxOutput);
     osc.start(t);
     osc.stop(t + 0.2);
   }
 
   playBossSpawn(): void {
     this.ensureContext();
-    if (!this.ctx || !this.masterGain || this.muted) return;
+    if (!this.ctx || !this.sfxOutput || this.muted) return;
 
     const t = this.ctx.currentTime;
 
@@ -232,7 +243,7 @@ export class AudioManager {
     gain.gain.exponentialRampToValueAtTime(0.001, t + 1.2);
 
     osc.connect(gain);
-    gain.connect(this.masterGain);
+    gain.connect(this.sfxOutput);
     osc.start(t);
     osc.stop(t + 1.2);
 
@@ -247,14 +258,14 @@ export class AudioManager {
     subGain.gain.exponentialRampToValueAtTime(0.001, t + 1.5);
 
     sub.connect(subGain);
-    subGain.connect(this.masterGain);
+    subGain.connect(this.sfxOutput);
     sub.start(t);
     sub.stop(t + 1.5);
   }
 
   playAchievement(): void {
     this.ensureContext();
-    if (!this.ctx || !this.masterGain || this.muted) return;
+    if (!this.ctx || !this.sfxOutput || this.muted) return;
 
     const t = this.ctx.currentTime;
     // Triumphant fanfare: ascending arpeggio with shimmer
@@ -273,7 +284,7 @@ export class AudioManager {
       gain.gain.exponentialRampToValueAtTime(0.001, start + 0.4);
 
       osc.connect(gain);
-      gain.connect(this.masterGain!);
+      gain.connect(this.sfxOutput!);
       osc.start(start);
       osc.stop(start + 0.4);
     });
@@ -287,14 +298,14 @@ export class AudioManager {
     shimmerGain.gain.linearRampToValueAtTime(0.08, t + 0.28);
     shimmerGain.gain.exponentialRampToValueAtTime(0.001, t + 0.8);
     shimmer.connect(shimmerGain);
-    shimmerGain.connect(this.masterGain);
+    shimmerGain.connect(this.sfxOutput);
     shimmer.start(t + 0.24);
     shimmer.stop(t + 0.8);
   }
 
   playGameOver(): void {
     this.ensureContext();
-    if (!this.ctx || !this.masterGain || this.muted) return;
+    if (!this.ctx || !this.sfxOutput || this.muted) return;
 
     const t = this.ctx.currentTime;
     const notes = [440, 370, 311, 261]; // A4 descending
@@ -311,7 +322,7 @@ export class AudioManager {
       gain.gain.exponentialRampToValueAtTime(0.001, start + 0.5);
 
       osc.connect(gain);
-      gain.connect(this.masterGain!);
+      gain.connect(this.sfxOutput!);
       osc.start(start);
       osc.stop(start + 0.5);
     });
@@ -697,6 +708,42 @@ export class AudioManager {
     if (this.masterGain) {
       this.masterGain.gain.value = this.volume;
     }
+  }
+
+  setMasterVolume(value: number): void {
+    this.volume = Math.max(0, Math.min(1, value));
+    if (this.masterGain) {
+      this.masterGain.gain.value = this.volume;
+    }
+  }
+
+  getMasterVolume(): number {
+    return this.volume;
+  }
+
+  setMusicVolume(value: number): void {
+    this.musicMasterVolume = Math.max(0, Math.min(1, value)) * 0.15;
+    if (this.musicGain && this.ctx && !this.muted) {
+      const t = this.ctx.currentTime;
+      this.musicGain.gain.cancelScheduledValues(t);
+      this.musicGain.gain.setValueAtTime(this.musicGain.gain.value, t);
+      this.musicGain.gain.linearRampToValueAtTime(this.musicMasterVolume, t + 0.1);
+    }
+  }
+
+  getMusicVolume(): number {
+    return this.musicMasterVolume / 0.15;
+  }
+
+  setSfxVolume(value: number): void {
+    this.sfxVolume = Math.max(0, Math.min(1, value));
+    if (this.sfxGain) {
+      this.sfxGain.gain.value = this.sfxVolume;
+    }
+  }
+
+  getSfxVolume(): number {
+    return this.sfxVolume;
   }
 
   mute(): void {

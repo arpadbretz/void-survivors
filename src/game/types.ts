@@ -30,7 +30,7 @@ export interface Player extends Entity {
   lastDamageTime: number;
 }
 
-export type EnemyType = 'chaser' | 'shooter' | 'swarm' | 'tank' | 'splitter' | 'boss';
+export type EnemyType = 'chaser' | 'shooter' | 'swarm' | 'tank' | 'splitter' | 'boss' | 'phantom';
 
 export interface Enemy extends Entity {
   speed: number;
@@ -43,6 +43,8 @@ export interface Enemy extends Entity {
   rotation?: number;
   isElite?: boolean;
   spawnTime?: number;
+  phaseTimer?: number;
+  phaseState?: 'visible' | 'fading_out' | 'invisible' | 'fading_in';
 }
 
 export interface Projectile extends Entity {
@@ -52,6 +54,7 @@ export interface Projectile extends Entity {
   owner: 'player' | 'enemy';
   angle: number;
   aoe?: { radius: number; damageFraction: number };
+  isGravityWell?: boolean;
 }
 
 export interface Particle {

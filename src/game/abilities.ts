@@ -508,6 +508,64 @@ function xpMagnet(): Ability {
   };
 }
 
+function gravityWell(): Ability {
+  return {
+    id: 'gravity_well',
+    name: 'Gravity Well',
+    description: 'Creates a gravitational vortex that pulls and damages enemies.',
+    icon: '🌀',
+    level: 1,
+    maxLevel: 5,
+    color: '#8844ff',
+    cooldown: 5.0,
+    lastUsed: -999,
+    onUpdate(player, enemies, projectiles, particles, dt, gameTime) {
+      const cd = this.cooldown;
+      if (gameTime - this.lastUsed < cd) return [];
+      this.lastUsed = gameTime;
+
+      const result: Projectile[] = [];
+      const duration = 3 + (this.level - 1) * 0.5;
+      const radius = 80 + (this.level - 1) * 20;
+      const tickDamage = 2 + (this.level - 1) * 1;
+
+      // Evolved: Singularity — 2 wells, double pull, dark color
+      const wellCount = this.evolved ? 2 : 1;
+
+      for (let w = 0; w < wellCount; w++) {
+        // Place well at random position 100-200px from player
+        const placeDist = 100 + Math.random() * 100;
+        const placeAngle = Math.random() * Math.PI * 2;
+        const wellX = player.pos.x + Math.cos(placeAngle) * placeDist;
+        const wellY = player.pos.y + Math.sin(placeAngle) * placeDist;
+
+        const well: Projectile = {
+          id: `ap_${200000 + Math.floor(Math.random() * 100000)}`,
+          pos: { x: wellX, y: wellY },
+          vel: { x: 0, y: 0 },
+          radius: this.evolved ? radius * 1.2 : radius,
+          health: 1,
+          maxHealth: 1,
+          type: 'projectile',
+          color: this.evolved ? '#440088' : '#8844ff',
+          glowColor: this.evolved ? '#220044' : '#6622cc',
+          active: true,
+          damage: this.evolved ? tickDamage * 2 : tickDamage,
+          piercing: 999,
+          lifetime: duration,
+          owner: 'player',
+          angle: 0,
+          isGravityWell: true,
+        };
+        result.push(well);
+      }
+
+      particles.emit(player.pos.x, player.pos.y, 6, '#8844ff', 50, 0.3);
+      return result;
+    },
+  };
+}
+
 function speedBoost(): Ability {
   return {
     id: 'speed_boost',
@@ -543,6 +601,7 @@ const ABILITY_REGISTRY: AbilityFactory[] = [
   lifeDrain,
   xpMagnet,
   speedBoost,
+  gravityWell,
 ];
 
 // ── Public API ──────────────────────────────────────────────────
@@ -622,6 +681,7 @@ const EVOLUTION_MAP: Record<string, { name: string; icon: string; color: string 
   auto_cannon: { name: 'Railgun', icon: '⚡', color: '#ffdd00' },
   chain_lightning: { name: 'Thunder Storm', icon: '🌩️', color: '#ffffff' },
   missile_swarm: { name: 'Void Artillery', icon: '☄️', color: '#ff0044' },
+  gravity_well: { name: 'Singularity', icon: '🕳️', color: '#440088' },
 };
 
 export function applyUpgradeChoice(player: Player, choice: Ability): void {
@@ -670,6 +730,8 @@ export function getAbilityDescription(ability: Ability, level: number): string {
         return `EVOLVED: Thunder Storm — Chains to 8 targets, 80 damage. Every 3rd cast spawns lightning bolts.`;
       case 'missile_swarm':
         return `EVOLVED: Void Artillery — 8 massive missiles, 100 damage each. 2.0s cooldown.`;
+      case 'gravity_well':
+        return `EVOLVED: Singularity — 2 vortexes simultaneously, double pull strength and damage. Dark energy field.`;
     }
   }
 
@@ -692,6 +754,8 @@ export function getAbilityDescription(ability: Ability, level: number): string {
       return `XP pickup range +${level * 40}px.`;
     case 'speed_boost':
       return `Movement speed +${level * 25}.`;
+    case 'gravity_well':
+      return `Creates a vortex pulling enemies in. ${(3 + (level - 1) * 0.5).toFixed(1)}s duration, ${80 + (level - 1) * 20}px radius, ${2 + (level - 1)} tick damage.`;
     default:
       return ability.description;
   }

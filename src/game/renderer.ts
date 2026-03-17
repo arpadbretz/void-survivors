@@ -121,6 +121,15 @@ export class Renderer {
   // Star update timing
   private _lastStarUpdate: number = 0;
 
+  // Settings flags
+  public showFps: boolean = false;
+  public showMinimap: boolean = true;
+  public tutorialHintsEnabled: boolean = true;
+  public screenShakeEnabled: boolean = true;
+  private fpsFrames: number = 0;
+  private fpsLastTime: number = 0;
+  private fpsDisplay: number = 0;
+
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d')!;
@@ -447,6 +456,11 @@ export class Renderer {
         color = '#22dd88';
         rot = gameTime * 2;
         break;
+      case 'phantom':
+        sides = 4; // diamond shape
+        color = '#aa44ff';
+        rot = Math.PI / 4; // rotated 45 degrees to make a diamond
+        break;
       case 'boss':
         sides = 10;
         color = '#ff0000';
@@ -463,6 +477,49 @@ export class Renderer {
       color = '#ffd700';
     }
 
+    // Phantom phase alpha
+    let phantomAlpha = 1.0;
+    if (enemy.enemyType === 'phantom') {
+      const pt = enemy.phaseTimer ?? 0;
+      switch (enemy.phaseState) {
+        case 'visible':
+          phantomAlpha = 1.0;
+          break;
+        case 'fading_out':
+          phantomAlpha = 1.0 - (pt - 2) / 0.5 * 0.9; // lerp 1.0 -> 0.1
+          break;
+        case 'invisible':
+          phantomAlpha = 0.1;
+          break;
+        case 'fading_in':
+          phantomAlpha = 0.1 + (pt - 3.5) / 0.5 * 0.9; // lerp 0.1 -> 1.0
+          break;
+        default:
+          phantomAlpha = 1.0;
+      }
+
+      // Draw ghostly trail (2-3 previous positions with decreasing alpha)
+      ctx.globalCompositeOperation = 'lighter';
+      for (let i = 1; i <= 3; i++) {
+        const trailX = x - enemy.vel.x * 0.02 * i;
+        const trailY = y - enemy.vel.y * 0.02 * i;
+        const trailAlpha = phantomAlpha * (0.3 / i);
+        ctx.fillStyle = '#7700cc';
+        ctx.globalAlpha = trailAlpha;
+        ctx.beginPath();
+        // Diamond shape for trail
+        const tr = enemy.radius * (1 - i * 0.15);
+        ctx.moveTo(trailX, trailY - tr);
+        ctx.lineTo(trailX + tr, trailY);
+        ctx.lineTo(trailX, trailY + tr);
+        ctx.lineTo(trailX - tr, trailY);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
+    }
+
     // Spawn materialize animation (first 0.3s)
     const spawnElapsed = (enemy.spawnTime !== undefined && enemy.spawnTime > 0)
       ? gameTime - enemy.spawnTime
@@ -476,6 +533,11 @@ export class Renderer {
       ctx.scale(spawnT, spawnT);
       ctx.translate(-x, -y);
       ctx.globalAlpha = spawnT;
+    }
+
+    // Apply phantom alpha
+    if (enemy.enemyType === 'phantom') {
+      ctx.globalAlpha = (isSpawning ? spawnT : 1) * phantomAlpha;
     }
 
     ctx.globalCompositeOperation = 'lighter';
@@ -509,6 +571,11 @@ export class Renderer {
     }
 
     ctx.globalCompositeOperation = 'source-over';
+
+    // Reset phantom alpha
+    if (enemy.enemyType === 'phantom') {
+      ctx.globalAlpha = 1;
+    }
 
     if (isSpawning) {
       ctx.restore();
@@ -564,6 +631,62 @@ export class Renderer {
   drawProjectile(proj: Projectile, dt: number = 0.016): void {
     const ctx = this.ctx;
     const { x, y } = proj.pos;
+
+    // Special rendering for gravity well
+    if (proj.isGravityWell) {
+      ctx.globalCompositeOperation = 'lighter';
+      const gameTime = performance.now() * 0.001;
+
+      // Concentric circles with decreasing alpha
+      for (let i = 4; i >= 1; i--) {
+        const ringRadius = proj.radius * (i / 4);
+        const alpha = 0.15 / i;
+        ctx.strokeStyle = '#8844ff';
+        ctx.lineWidth = 2;
+        ctx.globalAlpha = alpha;
+        ctx.beginPath();
+        ctx.arc(x, y, ringRadius, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // Inner glow
+      ctx.fillStyle = '#440088';
+      ctx.globalAlpha = 0.15;
+      ctx.beginPath();
+      ctx.arc(x, y, proj.radius * 0.3, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Rotating particle ring
+      const particleCount = 8;
+      for (let i = 0; i < particleCount; i++) {
+        const a = gameTime * 2 + (i / particleCount) * Math.PI * 2;
+        const orbitR = proj.radius * 0.6;
+        const px = x + Math.cos(a) * orbitR;
+        const py = y + Math.sin(a) * orbitR;
+        ctx.fillStyle = i % 2 === 0 ? '#8844ff' : '#ff44aa';
+        ctx.globalAlpha = 0.6;
+        ctx.beginPath();
+        ctx.arc(px, py, 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Inner rotating particles (closer, faster)
+      for (let i = 0; i < 5; i++) {
+        const a = -gameTime * 3.5 + (i / 5) * Math.PI * 2;
+        const orbitR = proj.radius * 0.3;
+        const px = x + Math.cos(a) * orbitR;
+        const py = y + Math.sin(a) * orbitR;
+        ctx.fillStyle = '#ff44aa';
+        ctx.globalAlpha = 0.4;
+        ctx.beginPath();
+        ctx.arc(px, py, 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
+      return;
+    }
 
     ctx.globalCompositeOperation = 'lighter';
 
@@ -853,7 +976,14 @@ export class Renderer {
     this.drawAbilityIcons(player.abilities, state.time);
 
     // Minimap
-    this.drawMinimap(state, worldSize);
+    if (this.showMinimap) {
+      this.drawMinimap(state, worldSize);
+    }
+
+    // FPS counter
+    if (this.showFps) {
+      this.drawFpsCounter();
+    }
 
     // Combo counter
     const combo = state.combo ?? 0;
@@ -1070,6 +1200,7 @@ export class Renderer {
   // ── Tutorial Hints ───────────────────────────────────────────
 
   showTutorialHint(id: string, text: string, duration: number = 4): void {
+    if (!this.tutorialHintsEnabled) return;
     if (this.tutorialShown.has(id)) return;
     this.tutorialShown.add(id);
     this.tutorialHints.push({ text, time: performance.now() / 1000, duration });
@@ -1448,5 +1579,25 @@ export class Renderer {
 
   private xpForLevel(level: number): number {
     return level * 25 + level * level * 5;
+  }
+
+  // ── FPS Counter ────────────────────────────────────────────────
+
+  private drawFpsCounter(): void {
+    const now = performance.now();
+    this.fpsFrames++;
+    if (now - this.fpsLastTime >= 1000) {
+      this.fpsDisplay = this.fpsFrames;
+      this.fpsFrames = 0;
+      this.fpsLastTime = now;
+    }
+
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.font = '12px monospace';
+    ctx.textAlign = 'left';
+    ctx.fillStyle = 'rgba(0, 238, 255, 0.7)';
+    ctx.fillText(`FPS: ${this.fpsDisplay}`, 10, 16);
+    ctx.restore();
   }
 }

@@ -35,8 +35,8 @@ const WAVE_CONFIGS: WaveConfig[] = [
   { enemyTypes: ['chaser'], spawnRate: 2.5, maxEnemies: 8, duration: 30 },
   { enemyTypes: ['chaser', 'swarm'], spawnRate: 2.0, maxEnemies: 15, duration: 30 },
   { enemyTypes: ['chaser', 'swarm', 'shooter', 'splitter'], spawnRate: 1.5, maxEnemies: 22, duration: 30 },
-  { enemyTypes: ['chaser', 'shooter', 'tank', 'splitter'], spawnRate: 1.2, maxEnemies: 30, duration: 30 },
-  { enemyTypes: ['chaser', 'swarm', 'shooter', 'tank', 'splitter'], spawnRate: 1.0, maxEnemies: 40, duration: 30 },
+  { enemyTypes: ['chaser', 'shooter', 'tank', 'splitter', 'phantom'], spawnRate: 1.2, maxEnemies: 30, duration: 30 },
+  { enemyTypes: ['chaser', 'swarm', 'shooter', 'tank', 'splitter', 'phantom'], spawnRate: 1.0, maxEnemies: 40, duration: 30 },
 ];
 
 export function getWaveConfig(wave: number): WaveConfig {
@@ -151,6 +151,22 @@ export function createEnemy(
         color: '#22dd88',
         glowColor: '#00cc66',
         enemyType: 'splitter',
+      };
+
+    case 'phantom':
+      return {
+        ...base,
+        radius: 14,
+        health: Math.round(40 * scaleHP),
+        maxHealth: Math.round(40 * scaleHP),
+        speed: 100,
+        damage: Math.round(12 * scaleDmg),
+        xpValue: 20,
+        color: '#aa44ff',
+        glowColor: '#7700cc',
+        enemyType: 'phantom',
+        phaseTimer: Math.random() * 3,
+        phaseState: 'visible' as const,
       };
 
     case 'boss':
@@ -429,6 +445,30 @@ export function updateEnemies(
         const orbitAngle = angle(enemy.pos, player.pos) + Math.sin(gameTime * 2 + (enemy.phaseOffset ?? 0)) * 0.4;
         enemy.vel.x = Math.cos(orbitAngle) * enemy.speed;
         enemy.vel.y = Math.sin(orbitAngle) * enemy.speed;
+        break;
+      }
+
+      case 'phantom': {
+        // Always move toward player
+        enemy.vel.x = dir.x * enemy.speed;
+        enemy.vel.y = dir.y * enemy.speed;
+
+        // Update phase timer
+        if (enemy.phaseTimer === undefined) enemy.phaseTimer = 0;
+        enemy.phaseTimer += dt;
+        if (enemy.phaseTimer >= 4) enemy.phaseTimer -= 4;
+
+        // Determine phase state from timer
+        const pt = enemy.phaseTimer;
+        if (pt < 2) {
+          enemy.phaseState = 'visible';
+        } else if (pt < 2.5) {
+          enemy.phaseState = 'fading_out';
+        } else if (pt < 3.5) {
+          enemy.phaseState = 'invisible';
+        } else {
+          enemy.phaseState = 'fading_in';
+        }
         break;
       }
 

@@ -40,7 +40,7 @@ interface AchievementToast {
   expiresAt: number;
 }
 
-type GameScreen = "menu" | "playing" | "paused" | "upgrade" | "gameover" | "achievements" | "stats" | "shop" | "characters" | "daily";
+type GameScreen = "menu" | "playing" | "paused" | "upgrade" | "gameover" | "achievements" | "stats" | "shop" | "characters" | "daily" | "settings";
 
 interface HighScoreEntry {
   score: number;
@@ -100,6 +100,7 @@ interface GameEngineInterface {
   selectUpgrade: (index: number) => void;
   restart: () => void;
   setSoundEnabled: (enabled: boolean) => void;
+  applyDisplaySettings: (settings: { showFps: boolean; showMinimap: boolean; screenShake: boolean; tutorialHints: boolean }) => void;
   setCharacter: (characterId: string) => void;
   setDailyModifiers: (modifiers: import("@/game/daily").DailyModifier[]) => void;
   startAttractMode: (canvas: HTMLCanvasElement) => void;
@@ -197,6 +198,19 @@ export default function PlayPage() {
   // Fullscreen state
   const [isFullscreen, setIsFullscreen] = useState(false);
 
+  // Settings state
+  const [gameSettings, setGameSettings] = useState<import("@/game/settings").GameSettings>({
+    masterVolume: 0.8,
+    musicVolume: 0.6,
+    sfxVolume: 1.0,
+    muted: false,
+    screenShake: true,
+    tutorialHints: true,
+    showFps: false,
+    showMinimap: true,
+  });
+  const [settingsReturnScreen, setSettingsReturnScreen] = useState<GameScreen>("menu");
+
   // Share score state
   const [shareStatus, setShareStatus] = useState<"idle" | "shared" | "copied">("idle");
 
@@ -222,6 +236,13 @@ export default function PlayPage() {
       setDailyResult(dailyMod.loadDailyResult());
     });
 
+    // Load settings
+    import("@/game/settings").then((settingsMod) => {
+      const loaded = settingsMod.loadSettings();
+      setGameSettings(loaded);
+      setSoundEnabled(!loaded.muted);
+    });
+
     // Load achievement manager, lifetime stats, and meta-progression
     Promise.all([
       import("@/game/achievements"),
@@ -238,6 +259,18 @@ export default function PlayPage() {
       setLifetimeStats(stats);
 
       audioRef.current = audioMod.AudioManager.getInstance();
+
+      // Apply saved audio settings
+      import("@/game/settings").then((settingsMod) => {
+        const s = settingsMod.loadSettings();
+        const audio = audioRef.current;
+        if (audio) {
+          audio.setMasterVolume(s.masterVolume);
+          audio.setMusicVolume(s.musicVolume);
+          audio.setSfxVolume(s.sfxVolume);
+          if (s.muted) audio.mute();
+        }
+      });
 
       setMetaData(metaMod.loadMeta());
       setCharacterDefs(charMod.getCharacters());
@@ -518,8 +551,9 @@ export default function PlayPage() {
       onAchievementCheck: handleAchievementCheck,
     });
     engineRef.current.setSoundEnabled(soundEnabled);
+    engineRef.current.applyDisplaySettings(gameSettings);
     setScreen("playing");
-  }, [handleStateChange, handleLevelUp, handleGameOver, handleAchievementCheck, soundEnabled, selectedCharacter]);
+  }, [handleStateChange, handleLevelUp, handleGameOver, handleAchievementCheck, soundEnabled, selectedCharacter, gameSettings]);
 
   // -----------------------------------------------------------------------
   // Start daily challenge
@@ -536,9 +570,10 @@ export default function PlayPage() {
       onAchievementCheck: handleAchievementCheck,
     });
     engineRef.current.setSoundEnabled(soundEnabled);
+    engineRef.current.applyDisplaySettings(gameSettings);
     setIsDailyMode(true);
     setScreen("playing");
-  }, [handleStateChange, handleLevelUp, handleGameOver, handleAchievementCheck, soundEnabled, selectedCharacter, dailyChallenge]);
+  }, [handleStateChange, handleLevelUp, handleGameOver, handleAchievementCheck, soundEnabled, selectedCharacter, dailyChallenge, gameSettings]);
 
   // -----------------------------------------------------------------------
   // Select upgrade
@@ -566,8 +601,9 @@ export default function PlayPage() {
       onGameOver: handleGameOver,
       onAchievementCheck: handleAchievementCheck,
     });
+    engineRef.current?.applyDisplaySettings(gameSettings);
     setScreen("playing");
-  }, [handleStateChange, handleLevelUp, handleGameOver, handleAchievementCheck, selectedCharacter]);
+  }, [handleStateChange, handleLevelUp, handleGameOver, handleAchievementCheck, selectedCharacter, gameSettings]);
 
   const resumeGame = useCallback(() => {
     engineRef.current?.resume();
@@ -1064,19 +1100,33 @@ export default function PlayPage() {
             )}
 
             <button
-              onClick={toggleSound}
+              onClick={() => {
+                setSettingsReturnScreen("menu");
+                setScreen("settings");
+              }}
               style={{
                 marginTop: 16,
                 background: "none",
-                border: "1px solid rgba(255,255,255,0.15)",
+                border: "1px solid rgba(0,238,255,0.3)",
                 borderRadius: 8,
-                color: "rgba(224, 224, 240, 0.5)",
-                padding: "8px 16px",
+                color: "#00eeff",
+                padding: "10px 20px",
                 cursor: "pointer",
-                fontSize: "0.9rem",
+                fontSize: "0.95rem",
+                fontFamily: "var(--font-geist-mono), monospace",
+                letterSpacing: "0.05em",
+                transition: "all 0.2s",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = "#00eeff";
+                e.currentTarget.style.boxShadow = "0 0 12px rgba(0,238,255,0.3)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = "rgba(0,238,255,0.3)";
+                e.currentTarget.style.boxShadow = "none";
               }}
             >
-              {soundEnabled ? "\u{1F50A} Sound On" : "\u{1F507} Sound Off"}
+              {"\u2699\uFE0F"} Settings
             </button>
 
             {showInstallBtn && (
@@ -2471,6 +2521,16 @@ export default function PlayPage() {
                 MAIN MENU
               </button>
               <button
+                className="btn-neon"
+                onClick={() => {
+                  setSettingsReturnScreen("paused");
+                  setScreen("settings");
+                }}
+                style={{ fontSize: "1rem", padding: "12px 48px", minWidth: 220 }}
+              >
+                SETTINGS
+              </button>
+              <button
                 onClick={toggleSound}
                 style={{
                   marginTop: 8,
@@ -2499,6 +2559,331 @@ export default function PlayPage() {
             >
               Press ESC to resume
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* ============== Settings Screen ============== */}
+      {screen === "settings" && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 30,
+            background: "rgba(10, 10, 18, 0.92)",
+            backdropFilter: "blur(6px)",
+          }}
+        >
+          <div
+            className="animate-scale-in"
+            style={{
+              textAlign: "center",
+              maxWidth: 480,
+              width: "90%",
+              padding: "0 20px",
+            }}
+          >
+            <h2
+              style={{
+                fontSize: "clamp(1.8rem, 4vw, 2.5rem)",
+                fontWeight: 900,
+                color: "#00f0ff",
+                letterSpacing: "0.15em",
+                marginBottom: 32,
+                textShadow: "0 0 10px #00f0ff, 0 0 30px #00f0ff, 0 0 60px rgba(0,240,255,0.4)",
+              }}
+            >
+              {"\u2699\uFE0F"} SETTINGS
+            </h2>
+
+            {/* Sound Section */}
+            <div
+              style={{
+                background: "rgba(0,238,255,0.04)",
+                border: "1px solid rgba(0,238,255,0.15)",
+                borderRadius: 12,
+                padding: "20px 24px",
+                marginBottom: 16,
+                textAlign: "left",
+              }}
+            >
+              <h3 style={{ color: "#00eeff", fontSize: "1rem", fontWeight: 700, marginBottom: 16, letterSpacing: "0.1em" }}>
+                {"\u{1F50A}"} Sound
+              </h3>
+
+              {/* Master Volume */}
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                  <label style={{ color: "rgba(224,224,240,0.7)", fontSize: "0.85rem", fontFamily: "var(--font-geist-mono), monospace" }}>
+                    Master Volume
+                  </label>
+                  <span style={{ color: "#00eeff", fontSize: "0.8rem", fontFamily: "var(--font-geist-mono), monospace", minWidth: 36, textAlign: "right" }}>
+                    {Math.round(gameSettings.masterVolume * 100)}%
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={Math.round(gameSettings.masterVolume * 100)}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value) / 100;
+                    const updated = { ...gameSettings, masterVolume: val };
+                    setGameSettings(updated);
+                    audioRef.current?.setMasterVolume(val);
+                    import("@/game/settings").then((m) => m.saveSettings(updated));
+                  }}
+                  className="settings-slider"
+                  style={{ width: "100%" }}
+                />
+              </div>
+
+              {/* Music Volume */}
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                  <label style={{ color: "rgba(224,224,240,0.7)", fontSize: "0.85rem", fontFamily: "var(--font-geist-mono), monospace" }}>
+                    Music Volume
+                  </label>
+                  <span style={{ color: "#00eeff", fontSize: "0.8rem", fontFamily: "var(--font-geist-mono), monospace", minWidth: 36, textAlign: "right" }}>
+                    {Math.round(gameSettings.musicVolume * 100)}%
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={Math.round(gameSettings.musicVolume * 100)}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value) / 100;
+                    const updated = { ...gameSettings, musicVolume: val };
+                    setGameSettings(updated);
+                    audioRef.current?.setMusicVolume(val);
+                    import("@/game/settings").then((m) => m.saveSettings(updated));
+                  }}
+                  className="settings-slider"
+                  style={{ width: "100%" }}
+                />
+              </div>
+
+              {/* SFX Volume */}
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                  <label style={{ color: "rgba(224,224,240,0.7)", fontSize: "0.85rem", fontFamily: "var(--font-geist-mono), monospace" }}>
+                    SFX Volume
+                  </label>
+                  <span style={{ color: "#00eeff", fontSize: "0.8rem", fontFamily: "var(--font-geist-mono), monospace", minWidth: 36, textAlign: "right" }}>
+                    {Math.round(gameSettings.sfxVolume * 100)}%
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={Math.round(gameSettings.sfxVolume * 100)}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value) / 100;
+                    const updated = { ...gameSettings, sfxVolume: val };
+                    setGameSettings(updated);
+                    audioRef.current?.setSfxVolume(val);
+                    import("@/game/settings").then((m) => m.saveSettings(updated));
+                  }}
+                  className="settings-slider"
+                  style={{ width: "100%" }}
+                />
+              </div>
+
+              {/* Mute All */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <label style={{ color: "rgba(224,224,240,0.7)", fontSize: "0.85rem", fontFamily: "var(--font-geist-mono), monospace" }}>
+                  Mute All
+                </label>
+                <button
+                  onClick={() => {
+                    const updated = { ...gameSettings, muted: !gameSettings.muted };
+                    setGameSettings(updated);
+                    setSoundEnabled(!updated.muted);
+                    if (updated.muted) {
+                      audioRef.current?.mute();
+                      engineRef.current?.setSoundEnabled(false);
+                    } else {
+                      audioRef.current?.unmute();
+                      engineRef.current?.setSoundEnabled(true);
+                    }
+                    import("@/game/settings").then((m) => m.saveSettings(updated));
+                  }}
+                  style={{
+                    background: gameSettings.muted ? "rgba(0,238,255,0.2)" : "rgba(255,255,255,0.05)",
+                    border: `1px solid ${gameSettings.muted ? "#00eeff" : "rgba(255,255,255,0.15)"}`,
+                    borderRadius: 6,
+                    color: gameSettings.muted ? "#00eeff" : "rgba(224,224,240,0.5)",
+                    padding: "6px 16px",
+                    cursor: "pointer",
+                    fontSize: "0.8rem",
+                    fontFamily: "var(--font-geist-mono), monospace",
+                    transition: "all 0.2s",
+                  }}
+                >
+                  {gameSettings.muted ? "ON" : "OFF"}
+                </button>
+              </div>
+            </div>
+
+            {/* Gameplay Section */}
+            <div
+              style={{
+                background: "rgba(0,238,255,0.04)",
+                border: "1px solid rgba(0,238,255,0.15)",
+                borderRadius: 12,
+                padding: "20px 24px",
+                marginBottom: 16,
+                textAlign: "left",
+              }}
+            >
+              <h3 style={{ color: "#00eeff", fontSize: "1rem", fontWeight: 700, marginBottom: 16, letterSpacing: "0.1em" }}>
+                {"\u{1F3AE}"} Gameplay
+              </h3>
+
+              {/* Screen Shake */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                <label style={{ color: "rgba(224,224,240,0.7)", fontSize: "0.85rem", fontFamily: "var(--font-geist-mono), monospace" }}>
+                  Screen Shake
+                </label>
+                <button
+                  onClick={() => {
+                    const updated = { ...gameSettings, screenShake: !gameSettings.screenShake };
+                    setGameSettings(updated);
+                    engineRef.current?.applyDisplaySettings(updated);
+                    import("@/game/settings").then((m) => m.saveSettings(updated));
+                  }}
+                  style={{
+                    background: gameSettings.screenShake ? "rgba(0,238,255,0.2)" : "rgba(255,255,255,0.05)",
+                    border: `1px solid ${gameSettings.screenShake ? "#00eeff" : "rgba(255,255,255,0.15)"}`,
+                    borderRadius: 6,
+                    color: gameSettings.screenShake ? "#00eeff" : "rgba(224,224,240,0.5)",
+                    padding: "6px 16px",
+                    cursor: "pointer",
+                    fontSize: "0.8rem",
+                    fontFamily: "var(--font-geist-mono), monospace",
+                    transition: "all 0.2s",
+                  }}
+                >
+                  {gameSettings.screenShake ? "ON" : "OFF"}
+                </button>
+              </div>
+
+              {/* Tutorial Hints */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <label style={{ color: "rgba(224,224,240,0.7)", fontSize: "0.85rem", fontFamily: "var(--font-geist-mono), monospace" }}>
+                  Tutorial Hints
+                </label>
+                <button
+                  onClick={() => {
+                    const updated = { ...gameSettings, tutorialHints: !gameSettings.tutorialHints };
+                    setGameSettings(updated);
+                    engineRef.current?.applyDisplaySettings(updated);
+                    import("@/game/settings").then((m) => m.saveSettings(updated));
+                  }}
+                  style={{
+                    background: gameSettings.tutorialHints ? "rgba(0,238,255,0.2)" : "rgba(255,255,255,0.05)",
+                    border: `1px solid ${gameSettings.tutorialHints ? "#00eeff" : "rgba(255,255,255,0.15)"}`,
+                    borderRadius: 6,
+                    color: gameSettings.tutorialHints ? "#00eeff" : "rgba(224,224,240,0.5)",
+                    padding: "6px 16px",
+                    cursor: "pointer",
+                    fontSize: "0.8rem",
+                    fontFamily: "var(--font-geist-mono), monospace",
+                    transition: "all 0.2s",
+                  }}
+                >
+                  {gameSettings.tutorialHints ? "ON" : "OFF"}
+                </button>
+              </div>
+            </div>
+
+            {/* Display Section */}
+            <div
+              style={{
+                background: "rgba(0,238,255,0.04)",
+                border: "1px solid rgba(0,238,255,0.15)",
+                borderRadius: 12,
+                padding: "20px 24px",
+                marginBottom: 24,
+                textAlign: "left",
+              }}
+            >
+              <h3 style={{ color: "#00eeff", fontSize: "1rem", fontWeight: 700, marginBottom: 16, letterSpacing: "0.1em" }}>
+                {"\u{1F4F1}"} Display
+              </h3>
+
+              {/* Show FPS */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                <label style={{ color: "rgba(224,224,240,0.7)", fontSize: "0.85rem", fontFamily: "var(--font-geist-mono), monospace" }}>
+                  Show FPS
+                </label>
+                <button
+                  onClick={() => {
+                    const updated = { ...gameSettings, showFps: !gameSettings.showFps };
+                    setGameSettings(updated);
+                    engineRef.current?.applyDisplaySettings(updated);
+                    import("@/game/settings").then((m) => m.saveSettings(updated));
+                  }}
+                  style={{
+                    background: gameSettings.showFps ? "rgba(0,238,255,0.2)" : "rgba(255,255,255,0.05)",
+                    border: `1px solid ${gameSettings.showFps ? "#00eeff" : "rgba(255,255,255,0.15)"}`,
+                    borderRadius: 6,
+                    color: gameSettings.showFps ? "#00eeff" : "rgba(224,224,240,0.5)",
+                    padding: "6px 16px",
+                    cursor: "pointer",
+                    fontSize: "0.8rem",
+                    fontFamily: "var(--font-geist-mono), monospace",
+                    transition: "all 0.2s",
+                  }}
+                >
+                  {gameSettings.showFps ? "ON" : "OFF"}
+                </button>
+              </div>
+
+              {/* Show Minimap */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <label style={{ color: "rgba(224,224,240,0.7)", fontSize: "0.85rem", fontFamily: "var(--font-geist-mono), monospace" }}>
+                  Show Minimap
+                </label>
+                <button
+                  onClick={() => {
+                    const updated = { ...gameSettings, showMinimap: !gameSettings.showMinimap };
+                    setGameSettings(updated);
+                    engineRef.current?.applyDisplaySettings(updated);
+                    import("@/game/settings").then((m) => m.saveSettings(updated));
+                  }}
+                  style={{
+                    background: gameSettings.showMinimap ? "rgba(0,238,255,0.2)" : "rgba(255,255,255,0.05)",
+                    border: `1px solid ${gameSettings.showMinimap ? "#00eeff" : "rgba(255,255,255,0.15)"}`,
+                    borderRadius: 6,
+                    color: gameSettings.showMinimap ? "#00eeff" : "rgba(224,224,240,0.5)",
+                    padding: "6px 16px",
+                    cursor: "pointer",
+                    fontSize: "0.8rem",
+                    fontFamily: "var(--font-geist-mono), monospace",
+                    transition: "all 0.2s",
+                  }}
+                >
+                  {gameSettings.showMinimap ? "ON" : "OFF"}
+                </button>
+              </div>
+            </div>
+
+            {/* Back Button */}
+            <button
+              className="btn-neon"
+              onClick={() => setScreen(settingsReturnScreen)}
+              style={{ fontSize: "1rem", padding: "12px 48px", minWidth: 200 }}
+            >
+              BACK
+            </button>
           </div>
         </div>
       )}
