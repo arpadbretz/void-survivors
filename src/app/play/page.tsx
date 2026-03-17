@@ -53,7 +53,7 @@ interface AchievementToast {
   expiresAt: number;
 }
 
-type GameScreen = "menu" | "playing" | "paused" | "upgrade" | "gameover" | "achievements" | "stats" | "shop" | "characters" | "daily" | "settings";
+type GameScreen = "menu" | "playing" | "paused" | "upgrade" | "gameover" | "achievements" | "stats" | "shop" | "characters" | "daily" | "settings" | "leaderboard";
 
 interface HighScoreEntry {
   score: number;
@@ -210,6 +210,18 @@ export default function PlayPage() {
 
   // Stats tab state
   const [statsTab, setStatsTab] = useState<"overview" | "history">("overview");
+
+  // Leaderboard state
+  const [leaderboardData, setLeaderboardData] = useState<{ entries: { name: string; score: number; rank: number }[]; total: number } | null>(null);
+  const [leaderboardTab, setLeaderboardTab] = useState<"alltime" | "daily">("alltime");
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+  const [leaderboardError, setLeaderboardError] = useState<string | null>(null);
+  const [playerName, setPlayerName] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("void-survivors-player-name") || "";
+    }
+    return "";
+  });
 
   // Difficulty state
   const [selectedDifficulty, setSelectedDifficulty] = useState<import("@/game/difficulty").Difficulty>("normal");
@@ -520,8 +532,17 @@ export default function PlayPage() {
       // ignore
     }
 
+    // Submit to global leaderboard
+    if (playerName && stats.score > 0) {
+      fetch("/api/leaderboard", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: playerName, score: stats.score }),
+      }).catch(() => {});
+    }
+
     setScreen("gameover");
-  }, [isDailyMode, dailyChallenge]);
+  }, [isDailyMode, dailyChallenge, playerName]);
 
   // -----------------------------------------------------------------------
   // Real-time achievement check (during gameplay)
@@ -696,6 +717,49 @@ export default function PlayPage() {
       engineRef.current?.startAttractMode(canvasRef.current);
     }
   }, []);
+
+  // -----------------------------------------------------------------------
+  // Leaderboard
+  // -----------------------------------------------------------------------
+  const fetchLeaderboard = useCallback(async (type: "alltime" | "daily" = "alltime") => {
+    setLeaderboardLoading(true);
+    setLeaderboardError(null);
+    try {
+      const res = await fetch(`/api/leaderboard?type=${type}&limit=20`);
+      if (res.status === 503) {
+        setLeaderboardError("Leaderboard coming soon!");
+        setLeaderboardData(null);
+      } else if (!res.ok) {
+        setLeaderboardError("Failed to load leaderboard");
+        setLeaderboardData(null);
+      } else {
+        const data = await res.json();
+        setLeaderboardData(data);
+      }
+    } catch {
+      setLeaderboardError("Connection error");
+      setLeaderboardData(null);
+    } finally {
+      setLeaderboardLoading(false);
+    }
+  }, []);
+
+  const submitScore = useCallback(async (name: string, score: number) => {
+    if (!name.trim()) return;
+    const cleanName = name.replace(/[^a-zA-Z0-9_ -]/g, "").trim().substring(0, 20);
+    localStorage.setItem("void-survivors-player-name", cleanName);
+    setPlayerName(cleanName);
+    try {
+      await fetch("/api/leaderboard", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: cleanName, score }),
+      });
+      fetchLeaderboard(leaderboardTab);
+    } catch {
+      // Silently fail — score is still saved locally
+    }
+  }, [fetchLeaderboard, leaderboardTab]);
 
   // -----------------------------------------------------------------------
   // Share score
@@ -1211,6 +1275,37 @@ export default function PlayPage() {
                 {"\u{2728}"} Upgrades
               </button>
             </div>
+
+            {/* Leaderboard button */}
+            <button
+              onClick={() => { setScreen("leaderboard"); fetchLeaderboard(leaderboardTab); }}
+              style={{
+                marginTop: 12,
+                padding: "10px 28px",
+                fontSize: "0.95rem",
+                fontWeight: 700,
+                letterSpacing: "0.08em",
+                fontFamily: "var(--font-geist-mono), monospace",
+                background: "transparent",
+                color: "#ffaa00",
+                border: "1px solid rgba(255,170,0,0.3)",
+                borderRadius: 8,
+                cursor: "pointer",
+                transition: "all 0.2s",
+                width: "100%",
+                maxWidth: 320,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = "#ffaa00";
+                e.currentTarget.style.boxShadow = "0 0 12px rgba(255,170,0,0.3)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = "rgba(255,170,0,0.3)";
+                e.currentTarget.style.boxShadow = "none";
+              }}
+            >
+              {"\u{1F3C6}"} Leaderboard
+            </button>
 
             {/* Void Essence on menu */}
             {metaData && metaData.voidEssence > 0 && (
@@ -3799,6 +3894,70 @@ export default function PlayPage() {
         </div>
         );
       })()}
+
+      {/* ============== Leaderboard Screen ============== */}
+      {screen === "leaderboard" && (
+        <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", zIndex: 30, background: "rgba(10, 10, 18, 0.92)", backdropFilter: "blur(6px)" }}>
+          <div style={{ textAlign: "center", maxWidth: 520, width: "90%", maxHeight: "85vh", overflowY: "auto", padding: "0 20px" }}>
+            <h2 style={{ fontSize: "clamp(1.6rem, 3.5vw, 2.2rem)", fontWeight: 900, color: "#ffaa00", letterSpacing: "0.12em", marginBottom: 8, textShadow: "0 0 10px rgba(255,170,0,0.6)" }}>
+              {"\u{1F3C6}"} LEADERBOARD
+            </h2>
+            <div style={{ display: "flex", gap: 0, marginBottom: 20, justifyContent: "center" }}>
+              {(["alltime", "daily"] as const).map((tab) => {
+                const isActive = leaderboardTab === tab;
+                return (
+                  <button key={tab} onClick={() => { setLeaderboardTab(tab); fetchLeaderboard(tab); }} style={{ padding: "8px 24px", fontSize: "0.85rem", fontWeight: 700, background: "transparent", color: isActive ? "#ffaa00" : "rgba(224,224,240,0.4)", border: "none", borderBottom: isActive ? "2px solid #ffaa00" : "2px solid transparent", cursor: "pointer", fontFamily: "var(--font-geist-mono), monospace", letterSpacing: "0.08em" }}>
+                    {tab === "alltime" ? "All Time" : "Today"}
+                  </button>
+                );
+              })}
+            </div>
+            {!playerName && (
+              <div style={{ marginBottom: 16 }}>
+                <p style={{ color: "rgba(224,224,240,0.6)", fontSize: "0.8rem", marginBottom: 8 }}>Enter your name to appear on the leaderboard:</p>
+                <form onSubmit={(e) => { e.preventDefault(); const input = (e.target as HTMLFormElement).elements.namedItem("pname") as HTMLInputElement; if (input.value.trim()) { const name = input.value.replace(/[^a-zA-Z0-9_ -]/g, "").trim().substring(0, 20); localStorage.setItem("void-survivors-player-name", name); setPlayerName(name); } }} style={{ display: "flex", gap: 8, justifyContent: "center" }}>
+                  <input name="pname" type="text" maxLength={20} placeholder="Your name..." style={{ padding: "8px 14px", fontSize: "0.85rem", background: "rgba(0,0,0,0.4)", border: "1px solid rgba(255,170,0,0.3)", borderRadius: 6, color: "#fff", fontFamily: "var(--font-geist-mono), monospace", outline: "none", width: 180 }} />
+                  <button type="submit" style={{ padding: "8px 16px", fontSize: "0.85rem", fontWeight: 700, background: "rgba(255,170,0,0.15)", border: "1px solid rgba(255,170,0,0.4)", borderRadius: 6, color: "#ffaa00", cursor: "pointer", fontFamily: "var(--font-geist-mono), monospace" }}>Set</button>
+                </form>
+              </div>
+            )}
+            <div style={{ background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,170,0,0.15)", borderRadius: 12, padding: "16px 20px", marginBottom: 20 }}>
+              {leaderboardLoading && <p style={{ color: "rgba(224,224,240,0.5)", fontSize: "0.85rem", padding: 20 }}>Loading...</p>}
+              {leaderboardError && <p style={{ color: "rgba(255,170,0,0.6)", fontSize: "0.85rem", padding: 20 }}>{leaderboardError}</p>}
+              {!leaderboardLoading && !leaderboardError && leaderboardData && (
+                <>
+                  {leaderboardData.entries.length === 0 ? (
+                    <p style={{ color: "rgba(224,224,240,0.4)", fontSize: "0.85rem", padding: 20 }}>No scores yet. Be the first!</p>
+                  ) : (
+                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                      <thead><tr>
+                        <th style={{ padding: "6px 8px", textAlign: "left", color: "rgba(224,224,240,0.4)", fontSize: "0.7rem", fontWeight: 600, letterSpacing: "0.1em", borderBottom: "1px solid rgba(255,170,0,0.1)" }}>#</th>
+                        <th style={{ padding: "6px 8px", textAlign: "left", color: "rgba(224,224,240,0.4)", fontSize: "0.7rem", fontWeight: 600, letterSpacing: "0.1em", borderBottom: "1px solid rgba(255,170,0,0.1)" }}>PLAYER</th>
+                        <th style={{ padding: "6px 8px", textAlign: "right", color: "rgba(224,224,240,0.4)", fontSize: "0.7rem", fontWeight: 600, letterSpacing: "0.1em", borderBottom: "1px solid rgba(255,170,0,0.1)" }}>SCORE</th>
+                      </tr></thead>
+                      <tbody>
+                        {leaderboardData.entries.map((entry) => {
+                          const isMe = entry.name === playerName;
+                          const rankColor = entry.rank <= 3 ? ["#ffd700", "#c0c0c0", "#cd7f32"][entry.rank - 1] : "rgba(224,224,240,0.5)";
+                          return (
+                            <tr key={entry.rank} style={{ background: isMe ? "rgba(255,170,0,0.08)" : "transparent" }}>
+                              <td style={{ padding: "8px", color: rankColor, fontWeight: entry.rank <= 3 ? 800 : 400, fontSize: "0.85rem", fontFamily: "var(--font-geist-mono), monospace" }}>{entry.rank <= 3 ? ["\u{1F947}", "\u{1F948}", "\u{1F949}"][entry.rank - 1] : entry.rank}</td>
+                              <td style={{ padding: "8px", color: isMe ? "#ffaa00" : "rgba(224,224,240,0.8)", fontWeight: isMe ? 700 : 400, fontSize: "0.85rem", fontFamily: "var(--font-geist-mono), monospace" }}>{entry.name}{isMe ? " (you)" : ""}</td>
+                              <td style={{ padding: "8px", textAlign: "right", color: "#00eeff", fontWeight: 700, fontSize: "0.85rem", fontFamily: "var(--font-geist-mono), monospace" }}>{entry.score.toLocaleString()}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+                  {leaderboardData.total > 0 && <p style={{ color: "rgba(224,224,240,0.3)", fontSize: "0.7rem", marginTop: 12, textAlign: "center" }}>{leaderboardData.total.toLocaleString()} total players</p>}
+                </>
+              )}
+            </div>
+            <button onClick={() => setScreen("menu")} style={{ padding: "10px 32px", fontSize: "0.9rem", fontWeight: 700, background: "transparent", color: "#00eeff", border: "1px solid rgba(0,238,255,0.3)", borderRadius: 8, cursor: "pointer", fontFamily: "var(--font-geist-mono), monospace", letterSpacing: "0.08em" }}>Back to Menu</button>
+          </div>
+        </div>
+      )}
 
       {/* ============== Achievement Toast Notifications ============== */}
       {achievementToasts.length > 0 && (

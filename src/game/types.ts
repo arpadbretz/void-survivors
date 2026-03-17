@@ -59,6 +59,9 @@ export interface Projectile extends Entity {
   angle: number;
   aoe?: { radius: number; damageFraction: number };
   isGravityWell?: boolean;
+  isChainLightning?: boolean;
+  chainTargets?: Vector2[];   // chain path for lightning bolt rendering
+  spawnTime?: number;          // gameTime when created (for animation timing)
 }
 
 export interface Particle {

@@ -1485,6 +1485,9 @@ export class GameEngine {
     // Canvas HUD overlay
     r.drawHUD(s, WORLD_SIZE);
 
+    // Subtle CRT scanline overlay (last visual layer)
+    r.drawScanlines();
+
     // Upgrade screen
     if (s.showUpgradeScreen && s.upgradeChoices.length > 0) {
       r.drawUpgradeScreen(s.upgradeChoices, s.time);

@@ -57,6 +57,31 @@ interface BackgroundStar {
   twinkleSpeed: number;
 }
 
+interface NebulaClouds {
+  x: number;
+  y: number;
+  radius: number;
+  r: number;
+  g: number;
+  b: number;
+  alpha: number;
+  driftSpeed: number;
+  dirX: number;
+  dirY: number;
+}
+
+interface ParallaxStar {
+  x: number;
+  y: number;
+  size: number;
+  baseAlpha: number;
+  speed: number;
+  dirX: number;
+  dirY: number;
+  twinklePhase: number;
+  twinkleSpeed: number;
+}
+
 function getWaveColor(wave: number, table: { min: number; max: number; r: number; g: number; b: number }[]): { r: number; g: number; b: number } {
   for (const entry of table) {
     if (wave >= entry.min && wave <= entry.max) {
@@ -117,6 +142,15 @@ export class Renderer {
   private stars: BackgroundStar[] = [];
   private starsWorldSize: number = 4000;
 
+  // Nebula clouds
+  private nebulae: NebulaClouds[] = [];
+
+  // Parallax star layer (far, slower)
+  private parallaxStars: ParallaxStar[] = [];
+
+  // Pre-rendered scanline pattern
+  private scanlinePattern: CanvasPattern | null = null;
+
   // World edge pulse phase
   private edgePulsePhase: number = 0;
 
@@ -140,6 +174,15 @@ export class Renderer {
 
     // Initialize background stars
     this.initStars(4000);
+
+    // Initialize nebula clouds
+    this.initNebulae(4000);
+
+    // Initialize parallax star layer
+    this.initParallaxStars(4000);
+
+    // Pre-render scanline pattern
+    this.initScanlinePattern();
   }
 
   private initStars(worldSize: number): void {
@@ -160,6 +203,68 @@ export class Renderer {
         twinkleSpeed: 1.5 + Math.random() * 2,
       });
     }
+  }
+
+  private initNebulae(worldSize: number): void {
+    // Nebula color palette: deep purples, blues, magentas, teals
+    const nebulaColors: [number, number, number][] = [
+      [80, 20, 120],   // deep purple
+      [20, 40, 120],   // deep blue
+      [120, 20, 80],   // magenta
+      [20, 100, 100],  // teal
+      [60, 10, 100],   // violet
+      [20, 60, 110],   // slate blue
+    ];
+    this.nebulae = [];
+    const count = 4 + Math.floor(Math.random() * 3); // 4-6
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const col = nebulaColors[i % nebulaColors.length];
+      this.nebulae.push({
+        x: Math.random() * worldSize,
+        y: Math.random() * worldSize,
+        radius: 300 + Math.random() * 300,
+        r: col[0],
+        g: col[1],
+        b: col[2],
+        alpha: 0.02 + Math.random() * 0.02,
+        driftSpeed: 2 + Math.random() * 3,
+        dirX: Math.cos(angle),
+        dirY: Math.sin(angle),
+      });
+    }
+  }
+
+  private initParallaxStars(worldSize: number): void {
+    this.parallaxStars = [];
+    for (let i = 0; i < 30; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 2 + Math.random() * 5;
+      this.parallaxStars.push({
+        x: Math.random() * worldSize,
+        y: Math.random() * worldSize,
+        size: 2 + Math.random() * 2,
+        baseAlpha: 0.05 + Math.random() * 0.1,
+        speed,
+        dirX: Math.cos(angle),
+        dirY: Math.sin(angle),
+        twinklePhase: Math.random() * Math.PI * 2,
+        twinkleSpeed: 0.8 + Math.random() * 1.2,
+      });
+    }
+  }
+
+  private initScanlinePattern(): void {
+    // Pre-render a small repeating pattern for scanlines (3px period)
+    const patCanvas = document.createElement('canvas');
+    patCanvas.width = 1;
+    patCanvas.height = 3;
+    const patCtx = patCanvas.getContext('2d')!;
+    // Row 0 and 1: transparent, Row 2: faint black
+    patCtx.clearRect(0, 0, 1, 3);
+    patCtx.fillStyle = 'rgba(0, 0, 0, 0.015)';
+    patCtx.fillRect(0, 2, 1, 1);
+    this.scanlinePattern = this.ctx.createPattern(patCanvas, 'repeat');
   }
 
   resize(width: number, height: number): void {
@@ -318,7 +423,86 @@ export class Renderer {
     }
     ctx.stroke();
 
-    // Update and draw background stars (after grid, before entities)
+    // ── Grid Intersection Dots ──────────────────────────────────
+    ctx.fillStyle = `rgba(${gr}, ${gg}, ${gb}, 0.1)`;
+    for (let x = startX; x <= endX; x += GRID_SPACING) {
+      for (let y = startY; y <= endY; y += GRID_SPACING) {
+        ctx.fillRect(x - 1, y - 1, 2, 2);
+      }
+    }
+
+    // ── Nebula Clouds ─────────────────────────────────────────
+    const halfW = this.width / 2 + CULL_MARGIN;
+    const halfH = this.height / 2 + CULL_MARGIN;
+    const gameTime = now;
+
+    if (dt > 0 && dt < 0.5) {
+      const ws = this.starsWorldSize;
+      for (const neb of this.nebulae) {
+        neb.x += neb.dirX * neb.driftSpeed * dt;
+        neb.y += neb.dirY * neb.driftSpeed * dt;
+        if (neb.x < -neb.radius) neb.x += ws + neb.radius * 2;
+        else if (neb.x > ws + neb.radius) neb.x -= ws + neb.radius * 2;
+        if (neb.y < -neb.radius) neb.y += ws + neb.radius * 2;
+        else if (neb.y > ws + neb.radius) neb.y -= ws + neb.radius * 2;
+      }
+    }
+
+    for (const neb of this.nebulae) {
+      const ndx = neb.x - camera.x;
+      const ndy = neb.y - camera.y;
+      if (ndx < -(halfW + neb.radius) || ndx > (halfW + neb.radius) ||
+          ndy < -(halfH + neb.radius) || ndy > (halfH + neb.radius)) continue;
+
+      const grad = ctx.createRadialGradient(neb.x, neb.y, 0, neb.x, neb.y, neb.radius);
+      grad.addColorStop(0, `rgba(${neb.r}, ${neb.g}, ${neb.b}, ${neb.alpha})`);
+      grad.addColorStop(0.5, `rgba(${neb.r}, ${neb.g}, ${neb.b}, ${neb.alpha * 0.5})`);
+      grad.addColorStop(1, `rgba(${neb.r}, ${neb.g}, ${neb.b}, 0)`);
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(neb.x, neb.y, neb.radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // ── Parallax Star Layer (far, 0.5x camera speed) ─────────
+    if (dt > 0 && dt < 0.5) {
+      const ws = this.starsWorldSize;
+      for (const star of this.parallaxStars) {
+        star.x += star.dirX * star.speed * dt;
+        star.y += star.dirY * star.speed * dt;
+        if (star.x < 0) star.x += ws;
+        else if (star.x > ws) star.x -= ws;
+        if (star.y < 0) star.y += ws;
+        else if (star.y > ws) star.y -= ws;
+      }
+    }
+
+    const parallaxOffsetX = camera.x * 0.5;
+    const parallaxOffsetY = camera.y * 0.5;
+
+    for (const star of this.parallaxStars) {
+      const sx = star.x - parallaxOffsetX + camera.x;
+      const sy = star.y - parallaxOffsetY + camera.y;
+      const pdx = sx - camera.x;
+      const pdy = sy - camera.y;
+      if (pdx < -halfW || pdx > halfW || pdy < -halfH || pdy > halfH) continue;
+
+      const twinkle = Math.sin(gameTime * star.twinkleSpeed + star.twinklePhase);
+      const alpha = star.baseAlpha + twinkle * 0.05;
+      if (alpha <= 0.02) continue;
+
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = '#aabbcc';
+      ctx.fillRect(
+        sx - star.size * 0.5,
+        sy - star.size * 0.5,
+        star.size,
+        star.size
+      );
+    }
+    ctx.globalAlpha = 1;
+
+    // ── Foreground Stars (existing, 1.0x speed) ───────────────
     if (dt > 0 && dt < 0.5) {
       const ws = this.starsWorldSize;
       for (const star of this.stars) {
@@ -330,10 +514,6 @@ export class Renderer {
         else if (star.y > ws) star.y -= ws;
       }
     }
-
-    const halfW = this.width / 2 + CULL_MARGIN;
-    const halfH = this.height / 2 + CULL_MARGIN;
-    const gameTime = now;
 
     for (const star of this.stars) {
       const dx = star.x - camera.x;
@@ -692,6 +872,12 @@ export class Renderer {
     const ctx = this.ctx;
     const { x, y } = proj.pos;
 
+    // Special rendering for chain lightning
+    if (proj.isChainLightning) {
+      this.drawChainLightning(proj);
+      return;
+    }
+
     // Special rendering for gravity well
     if (proj.isGravityWell) {
       ctx.globalCompositeOperation = 'lighter';
@@ -797,6 +983,163 @@ export class Renderer {
     ctx.arc(x, y, proj.radius * 0.6, 0, Math.PI * 2);
     ctx.fill();
 
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  // ── Chain Lightning Rendering ─────────────────────────────────
+
+  /**
+   * Draw a jagged zigzag lightning bolt between two points.
+   * Outer stroke: thick electric blue; inner stroke: thin white.
+   */
+  private drawLightningBolt(
+    ctx: CanvasRenderingContext2D,
+    x1: number, y1: number,
+    x2: number, y2: number,
+    segments: number,
+    jitter: number,
+    alpha: number,
+    seed: number
+  ): void {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    if (len < 1) return;
+
+    // Perpendicular direction for lateral offsets
+    const nx = -dy / len;
+    const ny = dx / len;
+
+    // Build zigzag points
+    const points: { x: number; y: number }[] = [{ x: x1, y: y1 }];
+    for (let i = 1; i < segments; i++) {
+      const t = i / segments;
+      // Pseudo-random offset based on seed + segment index
+      const hash = Math.sin(seed * 127.1 + i * 311.7) * 43758.5453;
+      const offset = (hash - Math.floor(hash) - 0.5) * 2 * jitter;
+      points.push({
+        x: x1 + dx * t + nx * offset,
+        y: y1 + dy * t + ny * offset,
+      });
+    }
+    points.push({ x: x2, y: y2 });
+
+    // Outer glow bolt (thick, electric blue)
+    ctx.globalAlpha = alpha * 0.8;
+    ctx.strokeStyle = '#44aaff';
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) {
+      ctx.lineTo(points[i].x, points[i].y);
+    }
+    ctx.stroke();
+
+    // Inner bright core (thin, white)
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) {
+      ctx.lineTo(points[i].x, points[i].y);
+    }
+    ctx.stroke();
+  }
+
+  /**
+   * Render chain lightning: jagged bolts between chain targets,
+   * electric arc sparks on the projectile, and hit flashes.
+   */
+  private drawChainLightning(proj: Projectile): void {
+    const ctx = this.ctx;
+    const gameTime = performance.now() * 0.001;
+    // Fade based on remaining lifetime (starts at 0.25-0.3s, fades to 0)
+    const maxLife = proj.chainTargets ? 0.3 : 0.8;
+    const alpha = Math.max(0, Math.min(1, proj.lifetime / (maxLife * 0.5)));
+
+    ctx.globalCompositeOperation = 'lighter';
+
+    // ── Chain bolt connections ────────────────────────────
+    if (proj.chainTargets && proj.chainTargets.length > 1) {
+      const targets = proj.chainTargets;
+      // Animate seed so bolts crackle (change shape every ~0.05s)
+      const frameSeed = Math.floor(gameTime * 20);
+
+      for (let i = 0; i < targets.length - 1; i++) {
+        const src = targets[i];
+        const dst = targets[i + 1];
+
+        // Main bolt
+        this.drawLightningBolt(ctx, src.x, src.y, dst.x, dst.y, 6, 15, alpha, frameSeed + i * 7);
+        // Secondary thinner branch bolt for extra crackle
+        this.drawLightningBolt(ctx, src.x, src.y, dst.x, dst.y, 8, 20, alpha * 0.4, frameSeed + i * 13 + 99);
+
+        // Bright flash at each hit point
+        ctx.globalAlpha = alpha * 0.5;
+        ctx.fillStyle = '#44aaff';
+        ctx.beginPath();
+        ctx.arc(dst.x, dst.y, 18, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.globalAlpha = alpha * 0.8;
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(dst.x, dst.y, 6, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Flash at source point too
+      const src = targets[0];
+      ctx.globalAlpha = alpha * 0.4;
+      ctx.fillStyle = '#44aaff';
+      ctx.beginPath();
+      ctx.arc(src.x, src.y, 14, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // ── Electric arc spark on projectile position ────────
+    // For chain lightning projectiles that move (evolved cross-pattern bolts)
+    if (proj.vel.x !== 0 || proj.vel.y !== 0) {
+      const { x, y } = proj.pos;
+      const sparkSeed = Math.floor(gameTime * 15);
+
+      // Glow behind the projectile
+      ctx.globalAlpha = 0.3;
+      ctx.fillStyle = '#44aaff';
+      ctx.beginPath();
+      ctx.arc(x, y, 12, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 4 crackling zigzag arms radiating from center
+      for (let arm = 0; arm < 4; arm++) {
+        const baseAngle = (arm / 4) * Math.PI * 2 + gameTime * 5;
+        const armLen = 15;
+        const endX = x + Math.cos(baseAngle) * armLen;
+        const endY = y + Math.sin(baseAngle) * armLen;
+
+        // Mini bolt: 3 segments, small jitter
+        this.drawLightningBolt(ctx, x, y, endX, endY, 3, 6, 0.9, sparkSeed + arm * 17);
+      }
+
+      // Bright core
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(x, y, 3, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Electric blue mid
+      ctx.globalAlpha = 0.8;
+      ctx.fillStyle = '#44aaff';
+      ctx.beginPath();
+      ctx.arc(x, y, 5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
   }
 
@@ -1294,6 +1637,8 @@ export class Renderer {
     this.updateWaveColors(state.wave, state.time);
     if (this.starsWorldSize !== worldSize) {
       this.initStars(worldSize);
+      this.initNebulae(worldSize);
+      this.initParallaxStars(worldSize);
     }
 
     const ctx = this.ctx;
@@ -2072,6 +2417,15 @@ export class Renderer {
   }
 
   // ── FPS Counter ────────────────────────────────────────────────
+
+  // ── Scanline Overlay (CRT effect, screen-space) ──────────────
+
+  drawScanlines(): void {
+    if (!this.scanlinePattern) return;
+    const ctx = this.ctx;
+    ctx.fillStyle = this.scanlinePattern;
+    ctx.fillRect(0, 0, this.width, this.height);
+  }
 
   private drawFpsCounter(): void {
     const now = performance.now();

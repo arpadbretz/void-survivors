@@ -262,9 +262,10 @@ function chainLightning(): Ability {
         const range = 350;
         const result: Projectile[] = [];
 
-        let current = player.pos;
+        let current = { x: player.pos.x, y: player.pos.y };
         const hit = new Set<string>();
         const hitPositions: { x: number; y: number }[] = [];
+        const chainPath: { x: number; y: number }[] = [{ x: current.x, y: current.y }];
 
         for (let c = 0; c < chains; c++) {
           let nearest: Enemy | null = null;
@@ -280,10 +281,11 @@ function chainLightning(): Ability {
           if (!nearest) break;
           hit.add(nearest.id);
           nearest.health -= damage;
-          particles.emit(nearest.pos.x, nearest.pos.y, 8, '#ffffff', 100, 0.4);
+          particles.emit(nearest.pos.x, nearest.pos.y, 10, '#44aaff', 120, 0.5);
           particles.emitDamageNumber(nearest.pos.x, nearest.pos.y, damage);
           hitPositions.push({ x: nearest.pos.x, y: nearest.pos.y });
-          current = nearest.pos;
+          chainPath.push({ x: nearest.pos.x, y: nearest.pos.y });
+          current = { x: nearest.pos.x, y: nearest.pos.y };
         }
 
         // Every 3rd activation, spawn cross-pattern lightning bolts from each hit enemy
@@ -303,6 +305,37 @@ function chainLightning(): Ability {
           particles.emit(player.pos.x, player.pos.y, 15, '#ffffff', 120, 0.5);
         }
 
+        // Mark cross-pattern projectiles as chain lightning
+        for (const p of result) {
+          p.isChainLightning = true;
+          p.spawnTime = gameTime;
+        }
+
+        // Add visual bolt for the chain path
+        if (chainPath.length > 1) {
+          const boltVisual: Projectile = {
+            id: projId(),
+            pos: { x: chainPath[0].x, y: chainPath[0].y },
+            vel: { x: 0, y: 0 },
+            radius: 0,
+            health: 1,
+            maxHealth: 1,
+            type: 'projectile',
+            color: '#44aaff',
+            glowColor: '#aaddff',
+            active: true,
+            damage: 0,
+            piercing: 0,
+            lifetime: 0.3,
+            owner: 'player',
+            angle: 0,
+            isChainLightning: true,
+            chainTargets: chainPath,
+            spawnTime: gameTime,
+          };
+          result.push(boltVisual);
+        }
+
         return result;
       }
 
@@ -311,8 +344,9 @@ function chainLightning(): Ability {
       const range = 200 + this.level * 30;
 
       // Find nearest enemy
-      let current = player.pos;
+      let current = { x: player.pos.x, y: player.pos.y };
       const hit = new Set<string>();
+      const chainPath: { x: number; y: number }[] = [{ x: current.x, y: current.y }];
 
       for (let c = 0; c < chains; c++) {
         let nearest: Enemy | null = null;
@@ -331,9 +365,35 @@ function chainLightning(): Ability {
 
         hit.add(nearest.id);
         nearest.health -= damage;
-        particles.emit(nearest.pos.x, nearest.pos.y, 5, '#aaddff', 80, 0.3);
+        particles.emit(nearest.pos.x, nearest.pos.y, 8, '#44aaff', 100, 0.4);
         particles.emitDamageNumber(nearest.pos.x, nearest.pos.y, damage);
-        current = nearest.pos;
+        chainPath.push({ x: nearest.pos.x, y: nearest.pos.y });
+        current = { x: nearest.pos.x, y: nearest.pos.y };
+      }
+
+      // Create a visual-only projectile to render the lightning chain bolts
+      if (chainPath.length > 1) {
+        const boltVisual: Projectile = {
+          id: projId(),
+          pos: { x: chainPath[0].x, y: chainPath[0].y },
+          vel: { x: 0, y: 0 },
+          radius: 0,
+          health: 1,
+          maxHealth: 1,
+          type: 'projectile',
+          color: '#44aaff',
+          glowColor: '#aaddff',
+          active: true,
+          damage: 0,
+          piercing: 0,
+          lifetime: 0.25,
+          owner: 'player',
+          angle: 0,
+          isChainLightning: true,
+          chainTargets: chainPath,
+          spawnTime: gameTime,
+        };
+        return [boltVisual];
       }
 
       return [];
