@@ -129,6 +129,9 @@ export class GameEngine {
   private readonly DASH_DURATION = 0.15; // seconds
   private readonly DASH_COOLDOWN = 1.5; // seconds
 
+  // Tutorial triggers
+  private tutorialTriggered: Set<string> = new Set();
+
   // Bound event handlers for cleanup
   private boundKeyDown: ((e: KeyboardEvent) => void) | null = null;
   private boundKeyUp: ((e: KeyboardEvent) => void) | null = null;
@@ -169,6 +172,11 @@ export class GameEngine {
     this.initState();
     this.attachListeners();
     this.running = true;
+
+    // Tutorial: movement hint
+    setTimeout(() => {
+      this.renderer?.showTutorialHint('move', 'Use WASD or Arrow Keys to move');
+    }, 1000);
     this.lastTimestamp = performance.now();
     this.animationFrameId = requestAnimationFrame(this.gameLoop);
   }
@@ -305,6 +313,7 @@ export class GameEngine {
     this.dashTimer = 0;
     this.dashDirection = { x: 0, y: 0 };
     this.enemyManager.reset();
+    this.tutorialTriggered = new Set();
 
     // Reset input
     this.input.up = false;
@@ -697,10 +706,16 @@ export class GameEngine {
     p.health -= amount;
     p.lastDamageTime = this.state.time;
     p.invincibleUntil = this.state.time + 1.0;
-    this.state.screenShake = 8;
+    this.state.screenShake = Math.min(15, 4 + amount * 0.5);
 
     this.particles.emit(p.pos.x, p.pos.y, 10, '#ff3344', 100, 0.4);
     this.audio.playDamage();
+
+    // Tutorial: dash hint on first damage
+    if (!this.tutorialTriggered.has('dash')) {
+      this.tutorialTriggered.add('dash');
+      this.renderer?.showTutorialHint('dash', 'Press SPACE while moving to dash!', 5);
+    }
 
     if (p.health <= 0) {
       p.health = 0;
@@ -800,6 +815,12 @@ export class GameEngine {
       this.state.upgradeChoices = choices;
       this.state.showUpgradeScreen = true;
 
+      // Tutorial: upgrade hint
+      if (!this.tutorialTriggered.has('upgrade')) {
+        this.tutorialTriggered.add('upgrade');
+        this.renderer?.showTutorialHint('upgrade', 'Press 1, 2, or 3 to choose an upgrade');
+      }
+
       // Notify React UI
       if (this.callbacks) {
         this.callbacks.onLevelUp(
@@ -825,6 +846,12 @@ export class GameEngine {
       this.state.wave = expectedWave;
       this.renderer?.announceWave(expectedWave);
       this.audio.setMusicIntensity(this.state.wave / 10);
+
+      // Tutorial: combo hint when wave 2 starts
+      if (expectedWave === 2 && !this.tutorialTriggered.has('combo')) {
+        this.tutorialTriggered.add('combo');
+        this.renderer?.showTutorialHint('combo', 'Kill enemies quickly to build combos for bonus score!', 5);
+      }
     }
   }
 
@@ -941,6 +968,19 @@ export class GameEngine {
       '#00eeff',
       40
     );
+
+    // Staggered death explosions
+    for (let i = 1; i <= 3; i++) {
+      setTimeout(() => {
+        this.particles.emitExplosion(
+          this.state.player.pos.x + (Math.random() - 0.5) * 40,
+          this.state.player.pos.y + (Math.random() - 0.5) * 40,
+          ['#00eeff', '#ff00aa', '#ffdd00'][i - 1],
+          25
+        );
+      }, i * 150);
+    }
+    this.state.screenShake = 20;
 
     if (this.callbacks) {
       this.callbacks.onGameOver({

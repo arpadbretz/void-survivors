@@ -33,6 +33,10 @@ export class Renderer {
   private waveAnnounceDuration: number = 3; // seconds
   private waveAnnounceActive: boolean = false;
 
+  // Tutorial hint system
+  private tutorialHints: { text: string; time: number; duration: number }[] = [];
+  private tutorialShown: Set<string> = new Set();
+
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d')!;
@@ -136,6 +140,17 @@ export class Renderer {
       if (Math.floor(gameTime * 15) % 2 === 0) return;
     }
 
+    // Recent damage red flash (first 0.3s after hit)
+    const timeSinceHit = gameTime - player.lastDamageTime;
+    if (timeSinceHit < 0.3 && timeSinceHit >= 0) {
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = `rgba(255, 50, 50, ${0.4 * (1 - timeSinceHit / 0.3)})`;
+      ctx.beginPath();
+      ctx.arc(x, y, r * 1.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalCompositeOperation = 'source-over';
+    }
+
     ctx.globalCompositeOperation = 'lighter';
 
     // Outer glow — radial gradient (player is important, worth the cost)
@@ -212,6 +227,17 @@ export class Renderer {
     }
 
     ctx.globalCompositeOperation = 'source-over';
+
+    // Low health warning flash
+    if (enemy.health < enemy.maxHealth * 0.2 && enemy.health > 0) {
+      const flash = Math.sin(gameTime * 15) * 0.3 + 0.3;
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = `rgba(255, 255, 255, ${flash})`;
+      ctx.beginPath();
+      ctx.arc(x, y, enemy.radius * 0.8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalCompositeOperation = 'source-over';
+    }
 
     // Health bar if damaged
     if (enemy.health < enemy.maxHealth) {
@@ -520,6 +546,9 @@ export class Renderer {
 
     // Wave announcement banner
     this.drawWaveAnnouncement();
+
+    // Tutorial hints
+    this.drawTutorialHints();
   }
 
   private drawAbilityIcons(abilities: Ability[], gameTime: number): void {
@@ -659,6 +688,58 @@ export class Renderer {
     ctx.shadowBlur = 0;
     ctx.globalAlpha = 1;
     ctx.restore();
+  }
+
+  // ── Tutorial Hints ───────────────────────────────────────────
+
+  showTutorialHint(id: string, text: string, duration: number = 4): void {
+    if (this.tutorialShown.has(id)) return;
+    this.tutorialShown.add(id);
+    this.tutorialHints.push({ text, time: performance.now() / 1000, duration });
+  }
+
+  private drawTutorialHints(): void {
+    const now = performance.now() / 1000;
+    this.tutorialHints = this.tutorialHints.filter(h => now - h.time < h.duration);
+
+    const ctx = this.ctx;
+    let offsetY = 0;
+
+    for (const hint of this.tutorialHints) {
+      const elapsed = now - hint.time;
+      const fadeIn = Math.min(1, elapsed / 0.3);
+      const fadeOut = elapsed > hint.duration - 0.5 ? Math.max(0, (hint.duration - elapsed) / 0.5) : 1;
+      const alpha = fadeIn * fadeOut;
+
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.textAlign = 'center';
+
+      // Background pill
+      ctx.font = '13px monospace';
+      const textWidth = ctx.measureText(hint.text).width;
+      const pillWidth = textWidth + 40;
+      const pillX = this.width / 2 - pillWidth / 2;
+      const pillY = this.height * 0.7 + offsetY;
+
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+      ctx.beginPath();
+      ctx.roundRect(pillX, pillY, pillWidth, 32, 16);
+      ctx.fill();
+
+      ctx.strokeStyle = 'rgba(0, 240, 255, 0.4)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(pillX, pillY, pillWidth, 32, 16);
+      ctx.stroke();
+
+      // Text
+      ctx.fillStyle = '#00f0ff';
+      ctx.fillText(hint.text, this.width / 2, pillY + 21);
+
+      ctx.restore();
+      offsetY += 40;
+    }
   }
 
   // ── Upgrade Screen ────────────────────────────────────────────
