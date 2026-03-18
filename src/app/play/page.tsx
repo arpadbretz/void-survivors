@@ -21,6 +21,7 @@ interface HUDState {
   maxCombo: number;
   dashCooldown: number;
   enemiesKilled: number;
+  dps: number;
 }
 
 interface GameOverStats {
@@ -120,7 +121,7 @@ interface GameEngineInterface {
   rerollUpgradeChoices: () => void;
   restart: () => void;
   setSoundEnabled: (enabled: boolean) => void;
-  applyDisplaySettings: (settings: { showFps: boolean; showMinimap: boolean; screenShake: boolean; tutorialHints: boolean }) => void;
+  applyDisplaySettings: (settings: { showFps: boolean; showMinimap: boolean; screenShake: boolean; tutorialHints: boolean; autoCollectXP?: boolean }) => void;
   setCharacter: (characterId: string) => void;
   setDailyModifiers: (modifiers: import("@/game/daily").DailyModifier[]) => void;
   setDifficulty: (difficulty: import("@/game/difficulty").Difficulty) => void;
@@ -179,6 +180,12 @@ const LOADING_TIPS: string[] = [
   "Phantoms phase in and out \u2014 time your attacks",
   "Life Drain heals you for each enemy hit \u2014 great for survival",
   "Missile Swarm + Auto Cannon triggers the Bullet Hell synergy",
+  "Void Beam pierces through ALL enemies in a line",
+  "Mini-bosses spawn at milestone waves \u2014 they always drop loot!",
+  "You can reroll upgrade choices up to 2 times per level-up",
+  "The Chronomancer slows nearby enemies with a time dilation aura",
+  "Elite enemies have unique modifiers: swift, vampiric, armored, and more",
+  "Check the mini-map in the corner to track enemies and loot",
 ];
 
 // ---------------------------------------------------------------------------
@@ -204,6 +211,7 @@ export default function PlayPage() {
     maxCombo: 0,
     dashCooldown: 0,
     enemiesKilled: 0,
+    dps: 0,
   });
   const [upgradeChoices, setUpgradeChoices] = useState<UpgradeChoice[]>([]);
   const [rerollsUsed, setRerollsUsed] = useState(0);
@@ -286,6 +294,7 @@ export default function PlayPage() {
     tutorialHints: true,
     showFps: false,
     showMinimap: true,
+    autoCollectXP: false,
   });
   const [settingsReturnScreen, setSettingsReturnScreen] = useState<GameScreen>("menu");
 
@@ -2684,6 +2693,18 @@ export default function PlayPage() {
             >
               {Math.ceil(hud.health)} / {hud.maxHealth}
             </div>
+            <div
+              style={{
+                fontFamily: "var(--font-geist-mono), monospace",
+                fontSize: "0.6rem",
+                marginTop: 3,
+                textAlign: "left",
+                letterSpacing: "0.05em",
+              }}
+            >
+              <span style={{ color: "#00f0ff" }}>DPS: </span>
+              <span style={{ color: "#e0e0f0" }}>{hud.dps.toLocaleString()}</span>
+            </div>
           </div>
 
           {/* Top-center: Timer */}
@@ -3915,6 +3936,42 @@ export default function PlayPage() {
                   }}
                 >
                   {gameSettings.showMinimap ? "ON" : "OFF"}
+                </button>
+              </div>
+            </div>
+
+            {/* Gameplay Section */}
+            <div style={{ marginBottom: 18 }}>
+              <h3 style={{ color: "#00eeff", fontSize: "0.85rem", textTransform: "uppercase", letterSpacing: 2, marginBottom: 10, opacity: 0.7 }}>Gameplay</h3>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ color: "rgba(224,224,240,0.85)", fontSize: "0.9rem" }}>
+                    Auto-Collect XP
+                  </label>
+                  <p style={{ color: "rgba(224,224,240,0.4)", fontSize: "0.7rem", margin: "2px 0 0 0" }}>
+                    Automatically pulls all XP orbs to you. Recommended for casual play.
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    const updated = { ...gameSettings, autoCollectXP: !gameSettings.autoCollectXP };
+                    setGameSettings(updated);
+                    engineRef.current?.applyDisplaySettings(updated);
+                    import("@/game/settings").then((m) => m.saveSettings(updated));
+                  }}
+                  style={{
+                    background: gameSettings.autoCollectXP ? "rgba(0,238,255,0.2)" : "rgba(255,255,255,0.05)",
+                    border: `1px solid ${gameSettings.autoCollectXP ? "#00eeff" : "rgba(255,255,255,0.15)"}`,
+                    borderRadius: 6,
+                    color: gameSettings.autoCollectXP ? "#00eeff" : "rgba(224,224,240,0.5)",
+                    padding: "6px 16px",
+                    cursor: "pointer",
+                    fontSize: "0.8rem",
+                    fontFamily: "var(--font-geist-mono), monospace",
+                    transition: "all 0.2s",
+                  }}
+                >
+                  {gameSettings.autoCollectXP ? "ON" : "OFF"}
                 </button>
               </div>
             </div>

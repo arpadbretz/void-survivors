@@ -169,6 +169,9 @@ export class Renderer {
   // Star update timing
   private _lastStarUpdate: number = 0;
 
+  // Damage flash vignette
+  private damageFlashAlpha: number = 0;
+
   // Settings flags
   public showFps: boolean = false;
   public showMinimap: boolean = true;
@@ -3031,6 +3034,62 @@ export class Renderer {
   // ── FPS Counter ────────────────────────────────────────────────
 
   // ── Scanline Overlay (CRT effect, screen-space) ──────────────
+
+  // ── Damage Flash & Low Health Warning ─────────────────────────
+
+  triggerDamageFlash(): void {
+    this.damageFlashAlpha = 0.3;
+  }
+
+  drawDamageFlash(dt: number): void {
+    if (this.damageFlashAlpha <= 0) return;
+
+    const ctx = this.ctx;
+    const w = this.width;
+    const h = this.height;
+    const cx = w / 2;
+    const cy = h / 2;
+    const maxDim = Math.max(w, h);
+
+    // Radial gradient: transparent center, red edges
+    const grad = ctx.createRadialGradient(cx, cy, maxDim * 0.2, cx, cy, maxDim * 0.7);
+    grad.addColorStop(0, 'rgba(255, 0, 0, 0)');
+    grad.addColorStop(1, `rgba(255, 20, 20, ${this.damageFlashAlpha})`);
+
+    ctx.save();
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+    ctx.restore();
+
+    // Decay
+    this.damageFlashAlpha -= dt * 2;
+    if (this.damageFlashAlpha < 0) this.damageFlashAlpha = 0;
+  }
+
+  drawLowHealthWarning(player: Player, gameTime: number): void {
+    if (player.maxHealth <= 0) return;
+    if (player.health / player.maxHealth >= 0.25) return;
+
+    const ctx = this.ctx;
+    const w = this.width;
+    const h = this.height;
+    const cx = w / 2;
+    const cy = h / 2;
+    const maxDim = Math.max(w, h);
+
+    // Pulsing alpha using sine wave
+    const pulse = 0.5 + 0.5 * Math.sin(gameTime * 3);
+    const alpha = 0.08 + pulse * 0.12; // range ~0.08 to ~0.20
+
+    const grad = ctx.createRadialGradient(cx, cy, maxDim * 0.3, cx, cy, maxDim * 0.7);
+    grad.addColorStop(0, 'rgba(255, 0, 0, 0)');
+    grad.addColorStop(1, `rgba(200, 0, 0, ${alpha})`);
+
+    ctx.save();
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+    ctx.restore();
+  }
 
   drawScanlines(): void {
     if (!this.scanlinePattern) return;

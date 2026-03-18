@@ -76,6 +76,7 @@ interface EngineCallbacks {
     maxCombo: number;
     dashCooldown: number;
     enemiesKilled: number;
+    dps: number;
   }) => void;
   onLevelUp: (
     choices: {
@@ -150,6 +151,7 @@ export class GameEngine {
   private lastTimestamp: number = 0;
   private running: boolean = false;
   private soundEnabled: boolean = true;
+  private autoCollectXP: boolean = false;
 
   private enemiesKilled: number = 0;
   private bossesKilled: number = 0;
@@ -159,6 +161,11 @@ export class GameEngine {
   private phantomKillsThisRun: number = 0;
   private lastHudUpdate: number = 0;
   private lastAchievementCheck: number = 0;
+
+  // DPS tracking
+  private recentDamageDealt: number = 0;
+  private dpsDisplay: number = 0;
+  private dpsTimer: number = 0;
 
   // Enhanced run stats tracking
   private damageDealt: number = 0;
@@ -388,12 +395,15 @@ export class GameEngine {
     else this.audio.mute();
   }
 
-  applyDisplaySettings(settings: { showFps: boolean; showMinimap: boolean; screenShake: boolean; tutorialHints: boolean }): void {
+  applyDisplaySettings(settings: { showFps: boolean; showMinimap: boolean; screenShake: boolean; tutorialHints: boolean; autoCollectXP?: boolean }): void {
     if (this.renderer) {
       this.renderer.showFps = settings.showFps;
       this.renderer.showMinimap = settings.showMinimap;
       this.renderer.screenShakeEnabled = settings.screenShake;
       this.renderer.tutorialHintsEnabled = settings.tutorialHints;
+    }
+    if (settings.autoCollectXP !== undefined) {
+      this.autoCollectXP = settings.autoCollectXP;
     }
   }
 
@@ -507,6 +517,9 @@ export class GameEngine {
     this.maxCombo = 0;
     this.damageDealt = 0;
     this.damageTaken = 0;
+    this.recentDamageDealt = 0;
+    this.dpsDisplay = 0;
+    this.dpsTimer = 0;
     this.xpCollected = 0;
     this.elitesKilled = 0;
     this.lootCollected = 0;
@@ -544,7 +557,7 @@ export class GameEngine {
       this.update(dt);
     }
 
-    this.render();
+    this.render(dt);
     this.animationFrameId = requestAnimationFrame(this.gameLoop);
   };
 
@@ -808,6 +821,14 @@ export class GameEngine {
       this.triggerGameOver();
     }
 
+    // 15b. DPS tracking (1-second window)
+    this.dpsTimer += dt;
+    if (this.dpsTimer >= 1.0) {
+      this.dpsDisplay = this.recentDamageDealt;
+      this.recentDamageDealt = 0;
+      this.dpsTimer = 0;
+    }
+
     // 16. Push HUD state to React (throttled)
     if (s.time - this.lastHudUpdate >= HUD_UPDATE_INTERVAL) {
       this.lastHudUpdate = s.time;
@@ -956,8 +977,9 @@ export class GameEngine {
     const p = this.state.player;
 
     const magnetAbility = p.abilities.find((a) => a.id === 'xp_magnet');
-    const magnetRange =
-      BASE_MAGNET_RANGE + (magnetAbility ? magnetAbility.level * 40 : 0);
+    const magnetRange = this.autoCollectXP
+      ? 9999
+      : BASE_MAGNET_RANGE + (magnetAbility ? magnetAbility.level * 40 : 0);
 
     for (const orb of this.state.xpOrbs) {
       if (!orb.active) continue;
@@ -1127,6 +1149,7 @@ export class GameEngine {
 
           enemy.health -= actualDamage;
           this.damageDealt += actualDamage;
+          this.recentDamageDealt += actualDamage;
           this.particles.emitDamageNumber(
             enemy.pos.x,
             enemy.pos.y,
@@ -1150,6 +1173,7 @@ export class GameEngine {
                 }
                 other.health -= aoeActual;
                 this.damageDealt += aoeActual;
+                this.recentDamageDealt += aoeActual;
                 this.particles.emitDamageNumber(other.pos.x, other.pos.y, aoeActual, this.getComboColor());
                 this.particles.emit(other.pos.x, other.pos.y, 3, proj.color, 40, 0.15);
                 if (other.health <= 0) {
@@ -1221,6 +1245,7 @@ export class GameEngine {
 
     this.particles.emit(p.pos.x, p.pos.y, 10, '#ff3344', 100, 0.4);
     this.audio.playDamage();
+    this.renderer?.triggerDamageFlash();
 
     // Tutorial: dash hint on first damage
     if (!this.tutorialTriggered.has('dash')) {
@@ -1723,7 +1748,7 @@ export class GameEngine {
 
   // ── Render ────────────────────────────────────────────────────
 
-  private render(): void {
+  private render(dt: number = 0.016): void {
     if (!this.renderer) return;
 
     const s = this.state;
@@ -1784,6 +1809,12 @@ export class GameEngine {
       r.drawScreenFlash(s.screenShake / 15, '#ff3344');
     }
 
+    // Damage flash vignette
+    r.drawDamageFlash(dt);
+
+    // Low health warning vignette
+    r.drawLowHealthWarning(s.player, s.time);
+
     // Canvas HUD overlay
     r.drawHUD(s, WORLD_SIZE);
 
@@ -1827,6 +1858,7 @@ export class GameEngine {
       maxCombo: this.maxCombo,
       dashCooldown: Math.max(0, this.dashCooldown),
       enemiesKilled: this.enemiesKilled,
+      dps: this.dpsDisplay,
     });
   }
 

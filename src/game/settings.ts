@@ -11,6 +11,7 @@ export interface GameSettings {
   tutorialHints: boolean;
   showFps: boolean;
   showMinimap: boolean;
+  autoCollectXP: boolean;
 }
 
 export const DEFAULT_SETTINGS: GameSettings = {
@@ -22,6 +23,7 @@ export const DEFAULT_SETTINGS: GameSettings = {
   tutorialHints: true,
   showFps: false,
   showMinimap: true,
+  autoCollectXP: false,
 };
 
 const SETTINGS_KEY = 'void-survivors-settings';
