@@ -182,6 +182,17 @@ export class GameEngine {
     return undefined; // no combo active — use default
   }
 
+  /** Resolve the active trail color, cycling hue for prismatic */
+  private resolveTrailColor(defaultColor: string): string {
+    if (!this.trailColor) return defaultColor;
+    if (this.trailColor === 'prismatic') {
+      // Cycle through hues
+      this.prismaticHue = (this.prismaticHue + 3) % 360;
+      return `hsl(${this.prismaticHue}, 100%, 60%)`;
+    }
+    return this.trailColor;
+  }
+
   // Dash state
   private dashCooldown: number = 0;
   private dashTimer: number = 0;
@@ -217,6 +228,10 @@ export class GameEngine {
     armorBonus: 0,
     xpMultiplier: 1,
   };
+
+  // Trail color override from achievement rewards
+  private trailColor: string | null = null;
+  private prismaticHue: number = 0;
 
   // Bound event handlers for cleanup
   private boundKeyDown: ((e: KeyboardEvent) => void) | null = null;
@@ -329,6 +344,10 @@ export class GameEngine {
     this.difficulty = d;
     this.difficultyConfig = getDifficultyConfig(d);
     this.enemyManager.setDifficultyConfig(this.difficultyConfig);
+  }
+
+  setTrailColor(color: string | null): void {
+    this.trailColor = color;
   }
 
   setSoundEnabled(enabled: boolean): void {
@@ -772,11 +791,11 @@ export class GameEngine {
       p.vel.y = this.DASH_SPEED * this.dashDirection.y;
 
       // Emit extra trail particles during dash
-      this.particles.emitTrail(p.pos.x, p.pos.y, '#00ffff');
+      this.particles.emitTrail(p.pos.x, p.pos.y, this.resolveTrailColor('#00ffff'));
       this.particles.emitTrail(
         p.pos.x + (Math.random() - 0.5) * 10,
         p.pos.y + (Math.random() - 0.5) * 10,
-        '#88eeff'
+        this.resolveTrailColor('#88eeff')
       );
     } else {
       const speedSynBonuses = computeSynergyBonuses(this.state.activeSynergies);
@@ -792,7 +811,7 @@ export class GameEngine {
     p.pos.y = clamp(p.pos.y, p.radius, WORLD_SIZE - p.radius);
 
     if (dx !== 0 || dy !== 0) {
-      this.particles.emitTrail(p.pos.x, p.pos.y, '#00aacc');
+      this.particles.emitTrail(p.pos.x, p.pos.y, this.resolveTrailColor('#00aacc'));
     }
 
     // Passive health regeneration: 1 HP per 3 seconds + character bonus + synergy regen

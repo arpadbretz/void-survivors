@@ -824,7 +824,7 @@ export default function HomePage() {
                 textTransform: "uppercase",
               }}
             >
-              v1.8 &mdash; Latest
+              v2.0 &mdash; Latest
             </div>
             <p
               style={{
@@ -834,7 +834,39 @@ export default function HomePage() {
                 margin: 0,
               }}
             >
-              Ability Synergies, Global Leaderboard &amp; Visual Polish. Six ability synergy combos with passive bonuses, a cross-player leaderboard with daily rankings, enhanced orbit shield visuals, and nebula-filled cosmic backgrounds.
+              Shielder Enemy, Plasma Wave &amp; Arcanist. New Shielder enemy with protective aura, Plasma Wave ability with Supernova evolution, 4th unlockable character Arcanist, enhanced pause/game over screens, kill streak announcements, and wave enemy previews.
+            </p>
+          </div>
+
+          <div
+            className="glass"
+            style={{
+              padding: "20px 24px",
+              borderRadius: 12,
+              borderLeft: "3px solid #00f0ff",
+            }}
+          >
+            <div
+              style={{
+                fontSize: "0.75rem",
+                letterSpacing: "0.12em",
+                color: "#00f0ff",
+                fontWeight: 700,
+                marginBottom: 6,
+                textTransform: "uppercase",
+              }}
+            >
+              v1.8
+            </div>
+            <p
+              style={{
+                fontSize: "0.95rem",
+                color: "rgba(224,224,240,0.65)",
+                lineHeight: 1.6,
+                margin: 0,
+              }}
+            >
+              Ability Synergies, Global Leaderboard &amp; Visual Polish. Seven ability synergy combos with passive bonuses, a cross-player leaderboard with daily rankings, enhanced orbit shield visuals, and nebula-filled cosmic backgrounds.
             </p>
           </div>
 

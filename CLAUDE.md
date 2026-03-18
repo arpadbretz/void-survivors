@@ -19,7 +19,7 @@
 ### Game Engine (`src/game/`)
 - `engine.ts` — Main game loop, physics, collisions, state management
 - `renderer.ts` — Canvas 2D rendering, HUD, visual effects (neon aesthetic)
-- `enemies.ts` — Enemy spawning, AI, wave configs (7 types: chaser, shooter, swarm, tank, splitter, boss, phantom)
+- `enemies.ts` — Enemy spawning, AI, wave configs (8 types: chaser, shooter, swarm, tank, splitter, boss, phantom, shielder)
 - `abilities.ts` — 11 player abilities, 6 evolutions, 7 synergies
 - `audio.ts` — Procedural SFX and music via Web Audio API (singleton AudioManager)
 - `particles.ts` — Object-pooled particle system

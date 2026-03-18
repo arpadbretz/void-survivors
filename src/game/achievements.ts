@@ -2,6 +2,12 @@
 // Void Survivors — Achievement System
 // ============================================================
 
+export interface TrailReward {
+  type: 'trail_color';
+  value: string;
+  name: string;
+}
+
 export interface Achievement {
   id: string;
   name: string;
@@ -9,6 +15,7 @@ export interface Achievement {
   icon: string;
   condition: (stats: AchievementStats) => boolean;
   tier: 'bronze' | 'silver' | 'gold' | 'platinum';
+  reward?: TrailReward;
 }
 
 export interface AchievementStats {
@@ -44,20 +51,20 @@ export interface UnlockedAchievement {
 const ACHIEVEMENTS: Achievement[] = [
   // Kill milestones
   { id: 'first_blood', name: 'First Blood', description: 'Kill your first enemy', icon: '\u{1F5E1}\u{FE0F}', tier: 'bronze', condition: (s) => s.kills >= 1 },
-  { id: 'exterminator', name: 'Exterminator', description: 'Kill 50 enemies in one run', icon: '\u{1F480}', tier: 'bronze', condition: (s) => s.kills >= 50 },
+  { id: 'exterminator', name: 'Exterminator', description: 'Kill 50 enemies in one run', icon: '\u{1F480}', tier: 'bronze', condition: (s) => s.kills >= 50, reward: { type: 'trail_color', value: '#ff2222', name: 'Crimson Trail' } },
   { id: 'massacre', name: 'Massacre', description: 'Kill 200 enemies in one run', icon: '\u{2620}\u{FE0F}', tier: 'silver', condition: (s) => s.kills >= 200 },
-  { id: 'void_cleaner', name: 'Void Cleaner', description: 'Kill 500 enemies in one run', icon: '\u{1F525}', tier: 'gold', condition: (s) => s.kills >= 500 },
+  { id: 'void_cleaner', name: 'Void Cleaner', description: 'Kill 500 enemies in one run', icon: '\u{1F525}', tier: 'gold', condition: (s) => s.kills >= 500, reward: { type: 'trail_color', value: '#9933ff', name: 'Violet Trail' } },
 
   // Wave milestones
   { id: 'wave_3', name: 'Getting Started', description: 'Reach wave 3', icon: '\u{1F30A}', tier: 'bronze', condition: (s) => s.wave >= 3 },
-  { id: 'wave_5', name: 'Survivor', description: 'Reach wave 5', icon: '\u{1F6E1}\u{FE0F}', tier: 'silver', condition: (s) => s.wave >= 5 },
+  { id: 'wave_5', name: 'Survivor', description: 'Reach wave 5', icon: '\u{1F6E1}\u{FE0F}', tier: 'silver', condition: (s) => s.wave >= 5, reward: { type: 'trail_color', value: '#ffd700', name: 'Golden Trail' } },
   { id: 'wave_10', name: 'Veteran', description: 'Reach wave 10', icon: '\u{2B50}', tier: 'gold', condition: (s) => s.wave >= 10 },
   { id: 'wave_15', name: 'Void Walker', description: 'Reach wave 15', icon: '\u{1F451}', tier: 'platinum', condition: (s) => s.wave >= 15 },
 
   // Combo milestones
   { id: 'combo_10', name: 'Combo Starter', description: 'Reach a 10x combo', icon: '\u{26A1}', tier: 'bronze', condition: (s) => s.combo >= 10 },
   { id: 'combo_25', name: 'Combo Master', description: 'Reach a 25x combo', icon: '\u{1F4A5}', tier: 'silver', condition: (s) => s.combo >= 25 },
-  { id: 'combo_50', name: 'Unstoppable', description: 'Reach a 50x combo', icon: '\u{1F31F}', tier: 'gold', condition: (s) => s.combo >= 50 },
+  { id: 'combo_50', name: 'Unstoppable', description: 'Reach a 50x combo', icon: '\u{1F31F}', tier: 'gold', condition: (s) => s.combo >= 50, reward: { type: 'trail_color', value: 'prismatic', name: 'Prismatic Trail' } },
 
   // Score milestones
   { id: 'score_1k', name: 'Score Hunter', description: 'Score 1,000 points', icon: '\u{1F3AF}', tier: 'bronze', condition: (s) => s.score >= 1000 },
@@ -79,7 +86,7 @@ const ACHIEVEMENTS: Achievement[] = [
   { id: 'games_25', name: 'Dedicated', description: 'Play 25 games', icon: '\u{1F3B2}', tier: 'silver', condition: (s) => s.gamesPlayed >= 25 },
   { id: 'total_kills_500', name: 'Serial Killer', description: 'Kill 500 enemies total', icon: '\u{2694}\u{FE0F}', tier: 'silver', condition: (s) => s.totalKills >= 500 },
   { id: 'total_kills_2000', name: 'Death Machine', description: 'Kill 2,000 enemies total', icon: '\u{1F52B}', tier: 'gold', condition: (s) => s.totalKills >= 2000 },
-  { id: 'boss_slayer', name: 'Boss Slayer', description: 'Kill a boss', icon: '\u{1F479}', tier: 'silver', condition: (s) => s.bossesKilled >= 1 },
+  { id: 'boss_slayer', name: 'Boss Slayer', description: 'Kill a boss', icon: '\u{1F479}', tier: 'silver', condition: (s) => s.bossesKilled >= 1, reward: { type: 'trail_color', value: '#ff6600', name: 'Inferno Trail' } },
 
   // Boss variant achievements
   { id: 'titan_slayer', name: 'Titan Slayer', description: 'Defeat a Titan boss', icon: '\u{1F9BE}', tier: 'silver', condition: (s) => (s.titanKills ?? 0) >= 1 },
@@ -104,7 +111,7 @@ const ACHIEVEMENTS: Achievement[] = [
 
   // Mastery achievements
   { id: 'veteran', name: 'Veteran', description: 'Play 50 total games', icon: '\u{1F396}\u{FE0F}', tier: 'silver', condition: (s) => s.gamesPlayed >= 50 },
-  { id: 'void_master', name: 'Void Master', description: 'Reach wave 20', icon: '\u{1F3C5}', tier: 'platinum', condition: (s) => s.wave >= 20 },
+  { id: 'void_master', name: 'Void Master', description: 'Reach wave 20', icon: '\u{1F3C5}', tier: 'platinum', condition: (s) => s.wave >= 20, reward: { type: 'trail_color', value: '#2a0040', name: 'Void Trail' } },
 ];
 
 const STORAGE_KEY = 'void-survivors-achievements';
@@ -190,6 +197,32 @@ export class AchievementManager {
   /** Total achievement count */
   getTotalCount(): number {
     return ACHIEVEMENTS.length;
+  }
+
+  /** Get all unlocked trail rewards */
+  getUnlockedTrailRewards(): { reward: TrailReward; achievementName: string }[] {
+    const results: { reward: TrailReward; achievementName: string }[] = [];
+    for (const achievement of ACHIEVEMENTS) {
+      if (achievement.reward && this.unlocked.has(achievement.id)) {
+        results.push({ reward: achievement.reward, achievementName: achievement.name });
+      }
+    }
+    return results;
+  }
+
+  /** Get all trail rewards with unlock status */
+  getAllTrailRewards(): { reward: TrailReward; achievementName: string; unlocked: boolean }[] {
+    const results: { reward: TrailReward; achievementName: string; unlocked: boolean }[] = [];
+    for (const achievement of ACHIEVEMENTS) {
+      if (achievement.reward) {
+        results.push({
+          reward: achievement.reward,
+          achievementName: achievement.name,
+          unlocked: this.unlocked.has(achievement.id),
+        });
+      }
+    }
+    return results;
   }
 
   /** Get tier color */

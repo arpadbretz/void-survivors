@@ -123,6 +123,7 @@ interface GameEngineInterface {
   setCharacter: (characterId: string) => void;
   setDailyModifiers: (modifiers: import("@/game/daily").DailyModifier[]) => void;
   setDifficulty: (difficulty: import("@/game/difficulty").Difficulty) => void;
+  setTrailColor: (color: string | null) => void;
   startAttractMode: (canvas: HTMLCanvasElement) => void;
   stopAttractMode: () => void;
 }
@@ -201,6 +202,11 @@ export default function PlayPage() {
   const [achievementFilter, setAchievementFilter] = useState<'all' | 'bronze' | 'silver' | 'gold' | 'platinum'>('all');
   const [allAchievements, setAllAchievements] = useState<(import("@/game/achievements").Achievement & { unlocked: boolean })[]>([]);
   const audioRef = useRef<import("@/game/audio").AudioManager | null>(null);
+
+  // Trail color cosmetic state
+  const TRAIL_STORAGE_KEY = "void-survivors-trail-color";
+  const [selectedTrailColor, setSelectedTrailColor] = useState<string | null>(null);
+  const [trailRewards, setTrailRewards] = useState<{ reward: import("@/game/achievements").TrailReward; achievementName: string; unlocked: boolean }[]>([]);
 
   // Meta-progression state
   const [metaData, setMetaData] = useState<import("@/game/meta").MetaProgression | null>(null);
@@ -316,6 +322,13 @@ export default function PlayPage() {
       const mgr = new achMod.AchievementManager();
       achievementManagerRef.current = mgr;
       setAchievementCount({ unlocked: mgr.getUnlockedCount(), total: mgr.getTotalCount() });
+      setTrailRewards(mgr.getAllTrailRewards());
+
+      // Load saved trail color preference
+      try {
+        const savedTrail = localStorage.getItem("void-survivors-trail-color");
+        if (savedTrail) setSelectedTrailColor(savedTrail);
+      } catch { /* ignore */ }
 
       const stats = statsMod.loadLifetimeStats();
       setLifetimeStats(stats);
@@ -672,6 +685,7 @@ export default function PlayPage() {
     engineRef.current.stopAttractMode();
     engineRef.current.setCharacter(selectedCharacter);
     engineRef.current.setDifficulty(selectedDifficulty);
+    engineRef.current.setTrailColor(selectedTrailColor);
     engineRef.current.setDailyModifiers([]);
     setIsDailyMode(false);
     engineRef.current.start(canvasRef.current, {
@@ -683,7 +697,7 @@ export default function PlayPage() {
     engineRef.current.setSoundEnabled(soundEnabled);
     engineRef.current.applyDisplaySettings(gameSettings);
     setScreen("playing");
-  }, [handleStateChange, handleLevelUp, handleGameOver, handleAchievementCheck, soundEnabled, selectedCharacter, selectedDifficulty, gameSettings]);
+  }, [handleStateChange, handleLevelUp, handleGameOver, handleAchievementCheck, soundEnabled, selectedCharacter, selectedDifficulty, selectedTrailColor, gameSettings]);
 
   // -----------------------------------------------------------------------
   // Start daily challenge
@@ -692,6 +706,7 @@ export default function PlayPage() {
     if (!canvasRef.current || !engineRef.current || !dailyChallenge) return;
     engineRef.current.stopAttractMode();
     engineRef.current.setCharacter(selectedCharacter);
+    engineRef.current.setTrailColor(selectedTrailColor);
     engineRef.current.setDailyModifiers(dailyChallenge.modifiers);
     engineRef.current.start(canvasRef.current, {
       onStateChange: handleStateChange,
@@ -1233,6 +1248,7 @@ export default function PlayPage() {
                 onClick={() => {
                   if (achievementManagerRef.current) {
                     setAllAchievements(achievementManagerRef.current.getAll());
+                    setTrailRewards(achievementManagerRef.current.getAllTrailRewards());
                   }
                   setAchievementFilter('all');
                   setScreen("achievements");
@@ -1810,9 +1826,153 @@ export default function PlayPage() {
                       >
                         {achievement.tier}
                       </div>
+                      {achievement.reward && (
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                            marginTop: 8,
+                            fontSize: "0.7rem",
+                            color: achievement.unlocked ? "#00eeff" : "rgba(224,224,240,0.3)",
+                          }}
+                        >
+                          <span
+                            style={{
+                              display: "inline-block",
+                              width: 10,
+                              height: 10,
+                              borderRadius: "50%",
+                              background: achievement.unlocked
+                                ? achievement.reward.value === "prismatic"
+                                  ? "conic-gradient(#ff0000, #ff8800, #ffff00, #00ff00, #0088ff, #8800ff, #ff0000)"
+                                  : achievement.reward.value
+                                : "rgba(255,255,255,0.15)",
+                              flexShrink: 0,
+                            }}
+                          />
+                          {achievement.reward.name}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
+            </div>
+
+            {/* Trail Rewards Section */}
+            <div style={{ marginTop: 40 }}>
+              <h3
+                style={{
+                  fontSize: "1.3rem",
+                  fontWeight: 700,
+                  color: "#00eeff",
+                  textAlign: "center",
+                  marginBottom: 16,
+                  letterSpacing: "0.1em",
+                }}
+              >
+                TRAIL COSMETICS
+              </h3>
+              <p style={{ color: "rgba(224,224,240,0.45)", fontSize: "0.8rem", textAlign: "center", marginBottom: 20 }}>
+                Unlock trail colors by earning achievements. Select one to equip.
+              </p>
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: 12,
+                  justifyContent: "center",
+                }}
+              >
+                {/* Default trail option */}
+                <button
+                  onClick={() => {
+                    setSelectedTrailColor(null);
+                    try { localStorage.removeItem(TRAIL_STORAGE_KEY); } catch { /* ignore */ }
+                  }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    background: selectedTrailColor === null ? "rgba(0,238,255,0.12)" : "rgba(255,255,255,0.03)",
+                    border: `1px solid ${selectedTrailColor === null ? "#00eeff" : "rgba(255,255,255,0.1)"}`,
+                    borderRadius: 8,
+                    padding: "8px 16px",
+                    cursor: "pointer",
+                    fontFamily: "var(--font-geist-mono), monospace",
+                    fontSize: "0.8rem",
+                    color: selectedTrailColor === null ? "#00eeff" : "rgba(224,224,240,0.6)",
+                    transition: "all 0.2s",
+                  }}
+                >
+                  <span
+                    style={{
+                      display: "inline-block",
+                      width: 14,
+                      height: 14,
+                      borderRadius: "50%",
+                      background: "#00aacc",
+                      flexShrink: 0,
+                    }}
+                  />
+                  Default
+                </button>
+
+                {trailRewards.map((tr) => {
+                  const isSelected = selectedTrailColor === tr.reward.value;
+                  const isPrismatic = tr.reward.value === "prismatic";
+                  const dotStyle: React.CSSProperties = {
+                    display: "inline-block",
+                    width: 14,
+                    height: 14,
+                    borderRadius: "50%",
+                    flexShrink: 0,
+                    background: tr.unlocked
+                      ? isPrismatic
+                        ? "conic-gradient(#ff0000, #ff8800, #ffff00, #00ff00, #0088ff, #8800ff, #ff0000)"
+                        : tr.reward.value
+                      : "rgba(255,255,255,0.15)",
+                  };
+                  return (
+                    <button
+                      key={tr.reward.value}
+                      disabled={!tr.unlocked}
+                      onClick={() => {
+                        if (!tr.unlocked) return;
+                        setSelectedTrailColor(tr.reward.value);
+                        try { localStorage.setItem(TRAIL_STORAGE_KEY, tr.reward.value); } catch { /* ignore */ }
+                      }}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        background: isSelected && tr.unlocked ? "rgba(0,238,255,0.12)" : "rgba(255,255,255,0.03)",
+                        border: `1px solid ${isSelected && tr.unlocked ? "#00eeff" : "rgba(255,255,255,0.1)"}`,
+                        borderRadius: 8,
+                        padding: "8px 16px",
+                        cursor: tr.unlocked ? "pointer" : "not-allowed",
+                        fontFamily: "var(--font-geist-mono), monospace",
+                        fontSize: "0.8rem",
+                        color: tr.unlocked
+                          ? isSelected ? "#00eeff" : "rgba(224,224,240,0.6)"
+                          : "rgba(224,224,240,0.25)",
+                        opacity: tr.unlocked ? 1 : 0.5,
+                        transition: "all 0.2s",
+                      }}
+                    >
+                      <span style={dotStyle} />
+                      <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
+                        <span>{tr.reward.name}</span>
+                        {!tr.unlocked && (
+                          <span style={{ fontSize: "0.65rem", color: "rgba(224,224,240,0.3)" }}>
+                            Unlock: {tr.achievementName}
+                          </span>
+                        )}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             {/* Back Button */}
