@@ -5,13 +5,13 @@
 // ============================================================
 
 import { NextRequest, NextResponse } from 'next/server';
+import { Redis } from '@upstash/redis';
 
 // ── Redis Client ────────────────────────────────────────────
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let redis: any = null;
+let redis: Redis | null = null;
 
-async function getRedis() {
+function getRedis(): Redis | null {
   if (redis) return redis;
 
   const url = process.env.UPSTASH_REDIS_REST_URL;
@@ -20,7 +20,6 @@ async function getRedis() {
   if (!url || !token) return null;
 
   try {
-    const { Redis } = await import('@upstash/redis');
     redis = new Redis({ url, token });
     return redis;
   } catch {
@@ -49,7 +48,7 @@ interface LeaderboardEntry {
 // ── GET — Fetch leaderboard ─────────────────────────────────
 
 export async function GET(request: NextRequest) {
-  const r = await getRedis();
+  const r = getRedis();
   if (!r) {
     return NextResponse.json({ error: 'Leaderboard not configured' }, { status: 503 });
   }
@@ -60,14 +59,14 @@ export async function GET(request: NextRequest) {
 
   try {
     const key = type === 'daily' ? getDailyKey() : LB_ALL_TIME;
-    const raw = await r.zrange(key, 0, limit - 1, { rev: true, withScores: true });
+    const raw = await r.zrange(key, 0, limit - 1, { rev: true, withScores: true }) as unknown[];
 
     // raw is [member, score, member, score, ...]
     const entries: LeaderboardEntry[] = [];
     for (let i = 0; i < raw.length; i += 2) {
       entries.push({
-        name: raw[i],
-        score: parseFloat(raw[i + 1]),
+        name: String(raw[i]),
+        score: parseFloat(String(raw[i + 1])),
         rank: i / 2 + 1,
       });
     }
@@ -86,7 +85,7 @@ export async function GET(request: NextRequest) {
 // ── POST — Submit a score ───────────────────────────────────
 
 export async function POST(request: NextRequest) {
-  const r = await getRedis();
+  const r = getRedis();
   if (!r) {
     return NextResponse.json({ error: 'Leaderboard not configured' }, { status: 503 });
   }
