@@ -19,7 +19,7 @@
 ### Game Engine (`src/game/`)
 - `engine.ts` — Main game loop, physics, collisions, state management
 - `renderer.ts` — Canvas 2D rendering, HUD, visual effects (neon aesthetic)
-- `enemies.ts` — Enemy spawning, AI, wave configs (8 types: chaser, shooter, swarm, tank, splitter, boss, phantom, shielder)
+- `enemies.ts` — Enemy spawning, AI, wave configs (9 types: chaser, shooter, swarm, tank, splitter, boss, phantom, shielder, miniboss)
 - `abilities.ts` — 12 player abilities, 7 evolutions, 7 synergies
 - `audio.ts` — Procedural SFX and music via Web Audio API (singleton AudioManager)
 - `particles.ts` — Object-pooled particle system
@@ -72,7 +72,7 @@
 - Shielder enemy: protective aura reduces nearby enemy damage by 50%
 - Achievement rewards: 6 unlockable trail colors (Crimson, Golden, Violet, Inferno, Prismatic, Void)
 - Passive XP trickle scales with wave, wave completion bonus XP
-- Game over tips: 14 random gameplay tips shown after each run
+- Game over tips: 21 random gameplay tips shown after each run
 - Wave announcement shows enemy type preview
 - Boss enrage timer: bosses enrage after 45s alive (+50% speed, +30% damage, red pulsing overlay)
 - Arcanist `cooldownReduction: 0.85` — 15% faster ability cooldowns, applied multiplicatively with synergies
@@ -80,6 +80,13 @@
 - Mini-map: 120x120 corner HUD showing enemies (red), bosses (yellow), loot (green), hazards (purple)
 - Elite enemy modifiers: swift (+80% speed), regenerating (3 HP/s), splitting (spawns 2 copies), vampiric (heals on hit), armored (40% damage reduction)
 - Regular enemy loot drops: 2% for normal enemies, 10% for elites, 100% for bosses
+- Void Beam: channeled piercing laser, evolves into Annihilation Ray (3x damage, 2x range)
+- Mini-boss system: powerful elite+ enemies at milestone waves (3, 6, 8, 11, etc.)
+- Upgrade reroll: reroll ability choices up to 2 times per level-up
+- DPS tracker: real-time damage per second counter on HUD
+- Damage flash: red screen edge vignette on hit, pulsing low health warning at <25% HP
+- Auto-Collect XP: toggle in settings, infinite magnet range for casual play
+- 21 game-over tips covering all v2.x features
 
 ## Performance Rules
 - Never use `shadowBlur` in the render loop
