@@ -91,6 +91,10 @@
 - First-run onboarding: progressive tutorial hints for new players (localStorage flag)
 - Smart PWA install prompt: shown after 2nd game over when installable
 - Fade transitions between all game screens
+- Evolution guide: pause screen shows ability evolution paths (ability → evolved form)
+- Kill feed: bottom-left overlay showing boss/elite kills, wave completions, evolutions
+- Accessibility: screen shake intensity slider (0-100%), colorblind mode (shape indicators), reduced motion mode
+- Upgrade reroll: 2 free rerolls per level-up on upgrade screen
 
 ## Performance Rules
 - Never use `shadowBlur` in the render loop
