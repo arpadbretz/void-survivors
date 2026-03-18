@@ -122,6 +122,9 @@ export class Renderer {
   // Kill streak announcement state
   private streakAnnouncements: { text: string; color: string; time: number }[] = [];
 
+  // Kill feed / combat log
+  public killFeed: { text: string; color: string; time: number }[] = [];
+
   // Wave pulse effect state
   private wavePulseActive: boolean = false;
   private wavePulseTime: number = 0;
@@ -176,7 +179,9 @@ export class Renderer {
   public showFps: boolean = false;
   public showMinimap: boolean = true;
   public tutorialHintsEnabled: boolean = true;
-  public screenShakeEnabled: boolean = true;
+  public screenShakeIntensity: number = 100; // 0-100
+  public colorblindMode: boolean = false;
+  public reducedMotion: boolean = false;
   private fpsFrames: number = 0;
   private fpsLastTime: number = 0;
   private fpsDisplay: number = 0;
@@ -1489,20 +1494,23 @@ export class Renderer {
       ctx.globalAlpha = alpha;
       ctx.textAlign = 'center';
 
+      // Colorblind mode: prepend shape indicator to damage numbers
+      const displayText = this.colorblindMode ? '× ' + p.text : p.text;
+
       // Critical hits get extra glow outline
       if (p.isCrit) {
         ctx.strokeStyle = '#ff0000';
         ctx.lineWidth = 2;
-        ctx.strokeText(p.text, p.pos.x, p.pos.y);
+        ctx.strokeText(displayText, p.pos.x, p.pos.y);
         // Bright white core for crits
         ctx.fillStyle = '#ffffff';
-        ctx.fillText(p.text, p.pos.x, p.pos.y);
+        ctx.fillText(displayText, p.pos.x, p.pos.y);
         // Then overlay with the red tint
         ctx.globalAlpha = alpha * 0.6;
         ctx.fillStyle = p.color;
-        ctx.fillText(p.text, p.pos.x, p.pos.y);
+        ctx.fillText(displayText, p.pos.x, p.pos.y);
       } else {
-        ctx.fillText(p.text, p.pos.x, p.pos.y);
+        ctx.fillText(displayText, p.pos.x, p.pos.y);
       }
 
       ctx.globalAlpha = 1;
@@ -1555,6 +1563,17 @@ export class Renderer {
     ctx.lineTo(x - r * 0.7, y);
     ctx.closePath();
     ctx.fill();
+
+    // Colorblind mode: draw ◆ symbol above XP orbs
+    if (this.colorblindMode) {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 0.9;
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 8px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('◆', x, y - r - 3);
+      ctx.globalAlpha = 1;
+    }
 
     ctx.globalCompositeOperation = 'source-over';
   }
@@ -1924,6 +1943,25 @@ export class Renderer {
     // Health — no shadowBlur
     ctx.fillStyle = color;
     ctx.fillRect(x - width / 2, y, width * ratio, barHeight);
+
+    // Colorblind mode: diagonal stripe pattern overlay on health bars
+    if (this.colorblindMode && ratio > 0) {
+      ctx.save();
+      ctx.globalAlpha = 0.35;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 0.5;
+      const barLeft = x - width / 2;
+      const barWidth = width * ratio;
+      ctx.beginPath();
+      ctx.rect(barLeft, y, barWidth, barHeight);
+      ctx.clip();
+      for (let sx = barLeft - barHeight; sx < barLeft + barWidth; sx += 3) {
+        ctx.moveTo(sx, y + barHeight);
+        ctx.lineTo(sx + barHeight, y);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
   }
 
   // ── Screen Flash ──────────────────────────────────────────────
@@ -2035,6 +2073,48 @@ export class Renderer {
     }
   }
 
+  addKillFeedEntry(text: string, color: string, gameTime: number): void {
+    this.killFeed.push({ text, color, time: gameTime });
+    if (this.killFeed.length > 10) {
+      this.killFeed = this.killFeed.slice(-10);
+    }
+  }
+
+  private drawKillFeed(gameTime: number): void {
+    const FADE_DURATION = 5;
+    const visible = this.killFeed.filter(e => gameTime - e.time < FADE_DURATION);
+    if (visible.length === 0) return;
+
+    const entries = visible.slice(-4);
+    const ctx = this.ctx;
+    const x = 10;
+    const baseY = this.height - 70;
+    const lineHeight = 16;
+
+    ctx.save();
+    ctx.textAlign = 'left';
+    ctx.font = '11px monospace';
+
+    for (let i = 0; i < entries.length; i++) {
+      const entry = entries[i];
+      const age = gameTime - entry.time;
+      const alpha = Math.max(0, 1 - age / FADE_DURATION);
+      const y = baseY - (entries.length - 1 - i) * lineHeight;
+
+      ctx.globalAlpha = alpha;
+
+      const textWidth = ctx.measureText(entry.text).width;
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+      ctx.fillRect(x - 4, y - 11, textWidth + 8, 14);
+
+      ctx.fillStyle = entry.color;
+      ctx.fillText(entry.text, x, y);
+    }
+
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
   announceWave(wave: number, subtitle?: string, preview?: string): void {
     this.waveAnnounceWave = wave;
     this.waveAnnounceTime = performance.now() / 1000;
@@ -2085,15 +2165,14 @@ export class Renderer {
     ctx.fillRect(hbX, hbY, hbWidth * healthRatio, hbHeight);
     ctx.globalAlpha = 1;
 
-    // HP text
+    // HP text (colorblind mode: prepend + symbol)
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 11px monospace';
     ctx.textAlign = 'center';
-    ctx.fillText(
-      `${Math.ceil(player.health)} / ${player.maxHealth}`,
-      this.width / 2,
-      hbY + hbHeight - 1
-    );
+    const hpText = this.colorblindMode
+      ? `+ ${Math.ceil(player.health)} / ${player.maxHealth}`
+      : `${Math.ceil(player.health)} / ${player.maxHealth}`;
+    ctx.fillText(hpText, this.width / 2, hbY + hbHeight - 1);
 
     // XP bar below health
     const xpY = hbY + hbHeight + 6;
@@ -2105,6 +2184,14 @@ export class Renderer {
 
     ctx.fillStyle = '#00ccff';
     ctx.fillRect(hbX, xpY, hbWidth * xpRatio, 4);
+
+    // Colorblind mode: diamond indicator on XP bar
+    if (this.colorblindMode) {
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 8px monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText('◆', hbX - 12, xpY + 5);
+    }
 
     // Level
     ctx.fillStyle = '#00ccff';
@@ -2293,6 +2380,9 @@ export class Renderer {
 
     // Synergy notifications
     this.drawSynergyNotifications();
+
+    // Kill feed / combat log
+    this.drawKillFeed(state.time);
   }
 
   private drawAbilityIcons(abilities: Ability[], gameTime: number): void {

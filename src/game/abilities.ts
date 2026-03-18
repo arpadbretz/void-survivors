@@ -860,7 +860,7 @@ export function getRandomUpgradeChoices(player: Player, count: number = 3): Abil
   return choices.slice(0, count);
 }
 
-const EVOLUTION_MAP: Record<string, { name: string; icon: string; color: string }> = {
+export const EVOLUTION_MAP: Record<string, { name: string; icon: string; color: string }> = {
   radial_shot: { name: 'Nova Burst', icon: '🌟', color: '#ff00ff' },
   auto_cannon: { name: 'Railgun', icon: '⚡', color: '#ffdd00' },
   chain_lightning: { name: 'Thunder Storm', icon: '🌩️', color: '#ffffff' },
@@ -869,6 +869,10 @@ const EVOLUTION_MAP: Record<string, { name: string; icon: string; color: string 
   plasma_wave: { name: 'Supernova', icon: '💥', color: '#ff88cc' },
   void_beam: { name: 'Annihilation Ray', icon: '☄️', color: '#ff44ff' },
 };
+
+export function getEvolutionInfo(abilityId: string): { name: string; icon: string; color: string } | null {
+  return EVOLUTION_MAP[abilityId] ?? null;
+}
 
 export function applyUpgradeChoice(player: Player, choice: Ability): void {
   const existing = player.abilities.find((a) => a.id === choice.id);

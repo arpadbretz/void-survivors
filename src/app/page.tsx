@@ -824,7 +824,7 @@ export default function HomePage() {
                 textTransform: "uppercase",
               }}
             >
-              v2.3 &mdash; Latest
+              v3.1 &mdash; Latest
             </div>
             <p
               style={{
@@ -834,7 +834,7 @@ export default function HomePage() {
                 margin: 0,
               }}
             >
-              Mini-Map, Elite Variants &amp; Chronomancer. Corner mini-map for world navigation, five elite enemy modifiers (swift, regenerating, splitting, vampiric, armored), 5th character Chronomancer with time dilation aura, and regular enemy loot drops.
+              Accessibility &amp; Polish. Evolution guide in pause screen, live kill feed, screen shake intensity slider, colorblind mode, reduced motion mode, share cards, onboarding tutorial, Void Beam, mini-bosses, and upgrade rerolls.
             </p>
           </div>
 

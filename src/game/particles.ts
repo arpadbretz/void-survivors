@@ -14,6 +14,7 @@ export class ParticleSystem implements ParticleSystemInterface {
   private activeList: Particle[];
   private trailFlip: boolean;
   private activeDamageNumbers: number;
+  public reducedMotion: boolean = false;
 
   constructor() {
     this.pool = [];
@@ -85,7 +86,8 @@ export class ParticleSystem implements ParticleSystemInterface {
   }
 
   emitExplosion(x: number, y: number, color: string, count: number = 20): void {
-    for (let i = 0; i < count; i++) {
+    const effectiveCount = this.reducedMotion ? Math.ceil(count * 0.5) : count;
+    for (let i = 0; i < effectiveCount; i++) {
       const p = this.acquire();
       if (!p) return;
 

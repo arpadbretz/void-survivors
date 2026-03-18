@@ -71,7 +71,7 @@ interface EngineCallbacks {
     xpToNext: number;
     time: number;
     paused: boolean;
-    abilities: { icon: string; name: string; level: number; color: string }[];
+    abilities: { icon: string; name: string; level: number; color: string; id: string; maxLevel: number; evolved: boolean }[];
     combo: number;
     maxCombo: number;
     dashCooldown: number;
@@ -152,6 +152,7 @@ export class GameEngine {
   private running: boolean = false;
   private soundEnabled: boolean = true;
   private autoCollectXP: boolean = false;
+  private reducedMotionEnabled: boolean = false;
 
   private enemiesKilled: number = 0;
   private bossesKilled: number = 0;
@@ -335,7 +336,18 @@ export class GameEngine {
     if (index < 0 || index >= this.state.upgradeChoices.length) return;
 
     const choice = this.state.upgradeChoices[index];
+
+    // Check if this upgrade will trigger an evolution
+    const existingAbility = this.state.player.abilities.find(a => a.id === choice.id);
+    const wasEvolved = existingAbility?.evolved || false;
+
     applyUpgradeChoice(this.state.player, choice);
+
+    // Check if ability just evolved
+    const updatedAbility = this.state.player.abilities.find(a => a.id === choice.id);
+    if (updatedAbility?.evolved && !wasEvolved) {
+      this.renderer?.addKillFeedEntry(`${updatedAbility.name} evolved!`, '#ff00ff', this.state.time);
+    }
 
     // Check for newly activated synergies
     this.checkSynergies();
@@ -408,15 +420,25 @@ export class GameEngine {
     else this.audio.mute();
   }
 
-  applyDisplaySettings(settings: { showFps: boolean; showMinimap: boolean; screenShake: boolean; tutorialHints: boolean; autoCollectXP?: boolean }): void {
+  applyDisplaySettings(settings: { showFps: boolean; showMinimap: boolean; screenShakeIntensity: number; tutorialHints: boolean; autoCollectXP?: boolean; colorblindMode?: boolean; reducedMotion?: boolean }): void {
     if (this.renderer) {
       this.renderer.showFps = settings.showFps;
       this.renderer.showMinimap = settings.showMinimap;
-      this.renderer.screenShakeEnabled = settings.screenShake;
+      this.renderer.screenShakeIntensity = settings.screenShakeIntensity;
       this.renderer.tutorialHintsEnabled = settings.tutorialHints;
+      if (settings.colorblindMode !== undefined) {
+        this.renderer.colorblindMode = settings.colorblindMode;
+      }
+      if (settings.reducedMotion !== undefined) {
+        this.renderer.reducedMotion = settings.reducedMotion;
+      }
     }
     if (settings.autoCollectXP !== undefined) {
       this.autoCollectXP = settings.autoCollectXP;
+    }
+    if (settings.reducedMotion !== undefined) {
+      this.reducedMotionEnabled = settings.reducedMotion;
+      this.particles.reducedMotion = settings.reducedMotion;
     }
   }
 
@@ -790,12 +812,13 @@ export class GameEngine {
     // 11. Camera
     this.updateCamera(dt);
 
-    // 12. Screen shake decay
-    if (s.screenShake > 0 && this.renderer?.screenShakeEnabled !== false) {
+    // 12. Screen shake decay (scaled by intensity setting)
+    const shakeIntensity = (this.renderer?.screenShakeIntensity ?? 100) / 100;
+    if (s.screenShake > 0 && shakeIntensity > 0) {
       s.screenShake *= 0.9;
       if (s.screenShake < 0.1) s.screenShake = 0;
-      s.camera.shakeX = (Math.random() - 0.5) * s.screenShake;
-      s.camera.shakeY = (Math.random() - 0.5) * s.screenShake;
+      s.camera.shakeX = (Math.random() - 0.5) * s.screenShake * shakeIntensity;
+      s.camera.shakeY = (Math.random() - 0.5) * s.screenShake * shakeIntensity;
     } else {
       s.screenShake = 0;
       s.camera.shakeX = 0;
@@ -901,13 +924,15 @@ export class GameEngine {
       p.vel.x = this.DASH_SPEED * this.dashDirection.x;
       p.vel.y = this.DASH_SPEED * this.dashDirection.y;
 
-      // Emit extra trail particles during dash
-      this.particles.emitTrail(p.pos.x, p.pos.y, this.resolveTrailColor('#00ffff'));
-      this.particles.emitTrail(
-        p.pos.x + (Math.random() - 0.5) * 10,
-        p.pos.y + (Math.random() - 0.5) * 10,
-        this.resolveTrailColor('#88eeff')
-      );
+      // Emit extra trail particles during dash (skip in reduced motion mode)
+      if (!this.reducedMotionEnabled) {
+        this.particles.emitTrail(p.pos.x, p.pos.y, this.resolveTrailColor('#00ffff'));
+        this.particles.emitTrail(
+          p.pos.x + (Math.random() - 0.5) * 10,
+          p.pos.y + (Math.random() - 0.5) * 10,
+          this.resolveTrailColor('#88eeff')
+        );
+      }
     } else {
       const speedSynBonuses = computeSynergyBonuses(this.state.activeSynergies);
       const effectiveSpeed = p.speed * speedSynBonuses.speedMult;
@@ -922,7 +947,9 @@ export class GameEngine {
     p.pos.y = clamp(p.pos.y, p.radius, WORLD_SIZE - p.radius);
 
     if (dx !== 0 || dy !== 0) {
-      this.particles.emitTrail(p.pos.x, p.pos.y, this.resolveTrailColor('#00aacc'));
+      if (!this.reducedMotionEnabled) {
+        this.particles.emitTrail(p.pos.x, p.pos.y, this.resolveTrailColor('#00aacc'));
+      }
 
       // First-run onboarding: track movement time for auto-ability hint
       if (this.isFirstRun && !this.tutorialTriggered.has('autofire')) {
@@ -1322,6 +1349,12 @@ export class GameEngine {
       this.elitesKilled++;
     }
 
+    // Kill feed: elite enemy slain
+    if (enemy.isElite && enemy.enemyType !== 'boss' && enemy.enemyType !== 'miniboss') {
+      const typeName = enemy.enemyType.charAt(0).toUpperCase() + enemy.enemyType.slice(1);
+      this.renderer?.addKillFeedEntry(`Elite ${typeName} slain!`, '#ffd700', this.state.time);
+    }
+
     // Combo tracking
     this.comboCount++;
     this.comboTimer = this.COMBO_TIMEOUT;
@@ -1404,6 +1437,9 @@ export class GameEngine {
       );
       this.state.screenShake = 15;
 
+      // Kill feed: boss defeated
+      this.renderer?.addKillFeedEntry('BOSS DEFEATED!', '#ff3344', this.state.time);
+
       // Drop random loot (boss: 100%)
       this.spawnLootDrop(enemy.pos.x, enemy.pos.y);
     } else if (enemy.enemyType === 'miniboss') {
@@ -1412,6 +1448,9 @@ export class GameEngine {
       this.state.score += 100 + this.state.wave * 20;
       this.particles.emitExplosion(enemy.pos.x, enemy.pos.y, '#ff8800', 25);
       this.state.screenShake = 10;
+
+      // Kill feed: mini-boss destroyed
+      this.renderer?.addKillFeedEntry('Mini-boss destroyed!', '#ff8800', this.state.time);
     } else if (enemy.enemyType === 'tank' || enemy.enemyType === 'splitter') {
       // Elite enemies: 10% chance to drop loot
       if (Math.random() < 0.10) {
@@ -1671,6 +1710,9 @@ export class GameEngine {
           activatedAt: this.state.time,
         });
 
+        // Kill feed: synergy activated
+        this.renderer?.addKillFeedEntry(`${syn.name} activated!`, '#ffd700', this.state.time);
+
         // Show notification via renderer
         this.renderer?.showSynergyNotification(syn.icon, syn.name, syn.description, syn.color);
 
@@ -1728,6 +1770,9 @@ export class GameEngine {
 
       // Reset speed multiplier each wave
       this.enemyManager.setWaveSpeedMultiplier(1);
+
+      // Kill feed: wave complete
+      this.renderer?.addKillFeedEntry(`Wave ${expectedWave - 1} complete`, '#00ffff', this.state.time);
 
       // Determine wave event
       const eventName = this.getWaveEventName(expectedWave);
@@ -1844,16 +1889,20 @@ export class GameEngine {
 
     r.resetCamera();
 
-    // Screen flash
-    if (s.screenShake > 1) {
+    // Screen flash (skip in reduced motion mode)
+    if (s.screenShake > 1 && !this.reducedMotionEnabled) {
       r.drawScreenFlash(s.screenShake / 15, '#ff3344');
     }
 
-    // Damage flash vignette
-    r.drawDamageFlash(dt);
+    // Damage flash vignette (skip in reduced motion mode)
+    if (!this.reducedMotionEnabled) {
+      r.drawDamageFlash(dt);
+    }
 
-    // Low health warning vignette
-    r.drawLowHealthWarning(s.player, s.time);
+    // Low health warning vignette (skip in reduced motion mode)
+    if (!this.reducedMotionEnabled) {
+      r.drawLowHealthWarning(s.player, s.time);
+    }
 
     // Canvas HUD overlay
     r.drawHUD(s, WORLD_SIZE);
@@ -1893,6 +1942,9 @@ export class GameEngine {
         name: a.name,
         level: a.level,
         color: a.color,
+        id: a.id,
+        maxLevel: a.maxLevel,
+        evolved: a.evolved || false,
       })),
       combo: this.comboCount,
       maxCombo: this.maxCombo,

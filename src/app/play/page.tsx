@@ -16,7 +16,7 @@ interface HUDState {
   xpToNext: number;
   time: number;
   paused: boolean;
-  abilities: { icon: string; name: string; level: number; color: string }[];
+  abilities: { icon: string; name: string; level: number; color: string; id: string; maxLevel: number; evolved: boolean }[];
   combo: number;
   maxCombo: number;
   dashCooldown: number;
@@ -121,7 +121,7 @@ interface GameEngineInterface {
   rerollUpgradeChoices: () => void;
   restart: () => void;
   setSoundEnabled: (enabled: boolean) => void;
-  applyDisplaySettings: (settings: { showFps: boolean; showMinimap: boolean; screenShake: boolean; tutorialHints: boolean; autoCollectXP?: boolean }) => void;
+  applyDisplaySettings: (settings: { showFps: boolean; showMinimap: boolean; screenShakeIntensity: number; tutorialHints: boolean; autoCollectXP?: boolean; colorblindMode?: boolean; reducedMotion?: boolean }) => void;
   setCharacter: (characterId: string) => void;
   setDailyModifiers: (modifiers: import("@/game/daily").DailyModifier[]) => void;
   setDifficulty: (difficulty: import("@/game/difficulty").Difficulty) => void;
@@ -406,11 +406,13 @@ export default function PlayPage() {
     musicVolume: 0.6,
     sfxVolume: 1.0,
     muted: false,
-    screenShake: true,
+    screenShakeIntensity: 100,
     tutorialHints: true,
     showFps: false,
     showMinimap: true,
     autoCollectXP: false,
+    colorblindMode: false,
+    reducedMotion: false,
   });
   const [settingsReturnScreen, setSettingsReturnScreen] = useState<GameScreen>("menu");
 
@@ -3436,10 +3438,7 @@ export default function PlayPage() {
           maxWidth: 380,
         };
         // Detect active synergies from current abilities
-        const abilityIds = hud.abilities.map(a => {
-          // Map ability name to id format
-          return a.name.toLowerCase().replace(/\s+/g, '_');
-        });
+        const abilityIds = hud.abilities.map(a => a.id);
         const activeSynergies = (() => {
           try {
             // Inline synergy detection since we can't async-import in render
@@ -3590,6 +3589,71 @@ export default function PlayPage() {
                 </div>
               </div>
             )}
+
+            {/* Evolution Guide */}
+            {(() => {
+              const EVOLUTION_INFO: Record<string, { name: string; icon: string; color: string }> = {
+                radial_shot: { name: "Nova Burst", icon: "\uD83C\uDF1F", color: "#ff00ff" },
+                auto_cannon: { name: "Railgun", icon: "\u26A1", color: "#ffdd00" },
+                chain_lightning: { name: "Thunder Storm", icon: "\uD83C\uDF29\uFE0F", color: "#ffffff" },
+                missile_swarm: { name: "Void Artillery", icon: "\u2604\uFE0F", color: "#ff0044" },
+                gravity_well: { name: "Singularity", icon: "\uD83D\uDD73\uFE0F", color: "#440088" },
+                plasma_wave: { name: "Supernova", icon: "\uD83D\uDCA5", color: "#ff88cc" },
+                void_beam: { name: "Annihilation Ray", icon: "\u2604\uFE0F", color: "#ff44ff" },
+              };
+              const evolvableAbilities = hud.abilities.filter(a => a.id in EVOLUTION_INFO);
+              if (evolvableAbilities.length === 0) return null;
+              return (
+                <div style={{
+                  ...pauseSectionStyle,
+                  borderColor: "rgba(255,215,0,0.18)",
+                  background: "rgba(255,215,0,0.02)",
+                }}>
+                  <div style={{
+                    fontSize: "0.65rem",
+                    fontWeight: 700,
+                    letterSpacing: "0.18em",
+                    color: "rgba(255,215,0,0.55)",
+                    marginBottom: 8,
+                    textTransform: "uppercase",
+                  }}>
+                    Evolution Guide
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                    {evolvableAbilities.map((ability, i) => {
+                      const evo = EVOLUTION_INFO[ability.id];
+                      if (!evo) return null;
+                      const isEvolved = ability.evolved;
+                      return (
+                        <div key={i} style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                          fontSize: "0.72rem",
+                          fontFamily: pauseMono,
+                        }}>
+                          {isEvolved ? (
+                            <>
+                              <span style={{ color: "#00ff88", fontWeight: 700 }}>{"\u2713"}</span>
+                              <span style={{ color: evo.color, fontWeight: 600 }}>{evo.icon} {evo.name}</span>
+                              <span style={{ color: "rgba(0,255,136,0.6)", fontSize: "0.62rem", fontWeight: 700 }}>(EVOLVED)</span>
+                            </>
+                          ) : (
+                            <>
+                              <span style={{ fontSize: "0.85rem" }}>{ability.icon}</span>
+                              <span style={{ color: ability.color }}>{ability.name}</span>
+                              <span style={{ color: "rgba(224,224,240,0.35)", fontSize: "0.65rem" }}>(Lv.{ability.level}/{ability.maxLevel})</span>
+                              <span style={{ color: "rgba(255,215,0,0.5)" }}>{"\u2192"}</span>
+                              <span style={{ color: evo.color, fontWeight: 600 }}>{evo.icon} {evo.name}</span>
+                            </>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Active Synergies */}
             {activeSynergies.length > 0 && (
@@ -3948,32 +4012,31 @@ export default function PlayPage() {
                 {"\u{1F3AE}"} Gameplay
               </h3>
 
-              {/* Screen Shake */}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                <label style={{ color: "rgba(224,224,240,0.7)", fontSize: "0.85rem", fontFamily: "var(--font-geist-mono), monospace" }}>
-                  Screen Shake
-                </label>
-                <button
-                  onClick={() => {
-                    const updated = { ...gameSettings, screenShake: !gameSettings.screenShake };
+              {/* Screen Shake Intensity */}
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                  <label style={{ color: "rgba(224,224,240,0.7)", fontSize: "0.85rem", fontFamily: "var(--font-geist-mono), monospace" }}>
+                    Screen Shake
+                  </label>
+                  <span style={{ color: "#00eeff", fontSize: "0.8rem", fontFamily: "var(--font-geist-mono), monospace", minWidth: 36, textAlign: "right" }}>
+                    {gameSettings.screenShakeIntensity}%
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={gameSettings.screenShakeIntensity}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value);
+                    const updated = { ...gameSettings, screenShakeIntensity: val };
                     setGameSettings(updated);
                     engineRef.current?.applyDisplaySettings(updated);
                     import("@/game/settings").then((m) => m.saveSettings(updated));
                   }}
-                  style={{
-                    background: gameSettings.screenShake ? "rgba(0,238,255,0.2)" : "rgba(255,255,255,0.05)",
-                    border: `1px solid ${gameSettings.screenShake ? "#00eeff" : "rgba(255,255,255,0.15)"}`,
-                    borderRadius: 6,
-                    color: gameSettings.screenShake ? "#00eeff" : "rgba(224,224,240,0.5)",
-                    padding: "6px 16px",
-                    cursor: "pointer",
-                    fontSize: "0.8rem",
-                    fontFamily: "var(--font-geist-mono), monospace",
-                    transition: "all 0.2s",
-                  }}
-                >
-                  {gameSettings.screenShake ? "ON" : "OFF"}
-                </button>
+                  className="settings-slider"
+                  style={{ width: "100%" }}
+                />
               </div>
 
               {/* Tutorial Hints */}
@@ -4049,7 +4112,7 @@ export default function PlayPage() {
               </div>
 
               {/* Show Minimap */}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
                 <label style={{ color: "rgba(224,224,240,0.7)", fontSize: "0.85rem", fontFamily: "var(--font-geist-mono), monospace" }}>
                   Show Minimap
                 </label>
@@ -4073,6 +4136,76 @@ export default function PlayPage() {
                   }}
                 >
                   {gameSettings.showMinimap ? "ON" : "OFF"}
+                </button>
+              </div>
+
+              {/* Colorblind Mode */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ color: "rgba(224,224,240,0.7)", fontSize: "0.85rem", fontFamily: "var(--font-geist-mono), monospace" }}>
+                    Colorblind Mode
+                  </label>
+                  <p style={{ color: "rgba(224,224,240,0.4)", fontSize: "0.7rem", margin: "2px 0 0 0" }}>
+                    Adds shape indicators alongside colors
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    const updated = { ...gameSettings, colorblindMode: !gameSettings.colorblindMode };
+                    setGameSettings(updated);
+                    engineRef.current?.applyDisplaySettings(updated);
+                    import("@/game/settings").then((m) => m.saveSettings(updated));
+                  }}
+                  style={{
+                    background: gameSettings.colorblindMode ? "rgba(0,238,255,0.2)" : "rgba(255,255,255,0.05)",
+                    border: `1px solid ${gameSettings.colorblindMode ? "#00eeff" : "rgba(255,255,255,0.15)"}`,
+                    borderRadius: 6,
+                    color: gameSettings.colorblindMode ? "#00eeff" : "rgba(224,224,240,0.5)",
+                    padding: "6px 16px",
+                    cursor: "pointer",
+                    fontSize: "0.8rem",
+                    fontFamily: "var(--font-geist-mono), monospace",
+                    transition: "all 0.2s",
+                    marginLeft: 12,
+                    flexShrink: 0,
+                  }}
+                >
+                  {gameSettings.colorblindMode ? "ON" : "OFF"}
+                </button>
+              </div>
+
+              {/* Reduced Motion */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ color: "rgba(224,224,240,0.7)", fontSize: "0.85rem", fontFamily: "var(--font-geist-mono), monospace" }}>
+                    Reduced Motion
+                  </label>
+                  <p style={{ color: "rgba(224,224,240,0.4)", fontSize: "0.7rem", margin: "2px 0 0 0" }}>
+                    Reduces particles and screen effects
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    const updated = { ...gameSettings, reducedMotion: !gameSettings.reducedMotion };
+                    setGameSettings(updated);
+                    engineRef.current?.applyDisplaySettings(updated);
+                    import("@/game/settings").then((m) => m.saveSettings(updated));
+                  }}
+                  style={{
+                    background: gameSettings.reducedMotion ? "rgba(0,238,255,0.2)" : "rgba(255,255,255,0.05)",
+                    border: `1px solid ${gameSettings.reducedMotion ? "#00eeff" : "rgba(255,255,255,0.15)"}`,
+                    borderRadius: 6,
+                    color: gameSettings.reducedMotion ? "#00eeff" : "rgba(224,224,240,0.5)",
+                    padding: "6px 16px",
+                    cursor: "pointer",
+                    fontSize: "0.8rem",
+                    fontFamily: "var(--font-geist-mono), monospace",
+                    transition: "all 0.2s",
+                    marginLeft: 12,
+                    flexShrink: 0,
+                  }}
+                >
+                  {gameSettings.reducedMotion ? "ON" : "OFF"}
                 </button>
               </div>
             </div>
