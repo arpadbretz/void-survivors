@@ -444,7 +444,7 @@ export default function HomePage() {
           />
           <FeatureCard
             icon={"🎭"}
-            title="4 Characters"
+            title="5 Characters"
             description="Choose from 4 unique characters — the balanced Void Walker, glass-cannon Phantom, tanky Sentinel, and ability-focused Arcanist. Unlock more as you play."
           />
           <FeatureCard
@@ -824,7 +824,7 @@ export default function HomePage() {
                 textTransform: "uppercase",
               }}
             >
-              v2.0 &mdash; Latest
+              v2.3 &mdash; Latest
             </div>
             <p
               style={{
@@ -834,7 +834,7 @@ export default function HomePage() {
                 margin: 0,
               }}
             >
-              Shielder Enemy, Plasma Wave &amp; Arcanist. New Shielder enemy with protective aura, Plasma Wave ability with Supernova evolution, 4th unlockable character Arcanist, enhanced pause/game over screens, kill streak announcements, and wave enemy previews.
+              Mini-Map, Elite Variants &amp; Chronomancer. Corner mini-map for world navigation, five elite enemy modifiers (swift, regenerating, splitting, vampiric, armored), 5th character Chronomancer with time dilation aura, and regular enemy loot drops.
             </p>
           </div>
 
@@ -856,7 +856,7 @@ export default function HomePage() {
                 textTransform: "uppercase",
               }}
             >
-              v1.8
+              v2.0
             </div>
             <p
               style={{
@@ -866,7 +866,7 @@ export default function HomePage() {
                 margin: 0,
               }}
             >
-              Ability Synergies, Global Leaderboard &amp; Visual Polish. Seven ability synergy combos with passive bonuses, a cross-player leaderboard with daily rankings, enhanced orbit shield visuals, and nebula-filled cosmic backgrounds.
+              Shielder Enemy, Plasma Wave &amp; Arcanist. Boss enrage timer, achievement trail cosmetics, ability synergies, global leaderboard, enhanced pause/game over screens, and wave enemy previews.
             </p>
           </div>
 
@@ -1235,7 +1235,7 @@ export default function HomePage() {
                 lineHeight: 1.6,
               }}
             >
-              There are 3 playable characters, each with unique stats and starting abilities: Void Walker, Phantom, and Sentinel. Each character offers a different playstyle.
+              There are 5 playable characters, each with unique stats and starting abilities: Void Walker, Phantom, Sentinel, Arcanist, and Chronomancer. Each character offers a different playstyle — from tanky defenders to time-bending specialists.
             </p>
           </details>
 
@@ -1365,7 +1365,7 @@ export default function HomePage() {
           { value: "11", label: "Abilities" },
           { value: "6", label: "Evolutions" },
           { value: "8", label: "Enemy Types" },
-          { value: "4", label: "Characters" },
+          { value: "5", label: "Characters" },
           { value: "40", label: "Achievements" },
           { value: "7", label: "Synergies" },
         ].map((stat) => (

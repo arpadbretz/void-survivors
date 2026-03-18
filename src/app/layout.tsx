@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 const SITE_URL = "https://void-survivors.vercel.app";
 const TITLE = "Void Survivors — A Neon Roguelike";
 const DESCRIPTION =
-  "Play Void Survivors free in your browser — a neon roguelike survivors game with 11 abilities, 6 evolutions, 7 synergies, 8 enemy types, 3 bosses, 4 characters, 40 achievements, global leaderboard, daily challenges, and meta-progression. No download required.";
+  "Play Void Survivors free in your browser — a neon roguelike survivors game with 11 abilities, 6 evolutions, 7 synergies, 8 enemy types, 5 elite variants, 3 bosses, 5 characters, 40 achievements, mini-map, global leaderboard, daily challenges, and meta-progression. No download required.";
 const OG_IMAGE = `${SITE_URL}/api/og`;
 
 export const metadata: Metadata = {
@@ -162,7 +162,7 @@ const jsonLd = [
         name: "How many characters are there in Void Survivors?",
         acceptedAnswer: {
           "@type": "Answer",
-          text: "There are 3 playable characters, each with unique stats and starting abilities: Void Walker, Phantom, and Sentinel. Each character offers a different playstyle.",
+          text: "There are 5 playable characters, each with unique stats and starting abilities: Void Walker, Phantom, Sentinel, Arcanist, and Chronomancer. Each character offers a different playstyle.",
         },
       },
       {

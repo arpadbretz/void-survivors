@@ -5,6 +5,7 @@
 import {
   Enemy,
   EnemyType,
+  EliteModifier,
   Player,
   Projectile,
   WaveConfig,
@@ -306,6 +307,8 @@ export function createSplitEnemies(pos: Vector2, wave: number, difficultyConfig?
 
 // ── Elite Modifier ──────────────────────────────────────────────
 
+const ELITE_MODIFIERS: EliteModifier[] = ['swift', 'regenerating', 'splitting', 'vampiric', 'armored'];
+
 export function makeElite(enemy: Enemy): Enemy {
   enemy.isElite = true;
   enemy.health = Math.round(enemy.health * 2.5);
@@ -315,7 +318,36 @@ export function makeElite(enemy: Enemy): Enemy {
   enemy.xpValue = Math.round(enemy.xpValue * 3);
   enemy.color = '#ffd700';
   enemy.glowColor = '#ffaa00';
+
+  // Assign a random elite modifier
+  const modifier = ELITE_MODIFIERS[Math.floor(Math.random() * ELITE_MODIFIERS.length)];
+  enemy.eliteModifier = modifier;
+
+  // Apply swift bonus at spawn time (speed + radius baked in)
+  if (modifier === 'swift') {
+    enemy.speed = Math.round(enemy.speed * 1.8);
+    enemy.radius = Math.max(6, enemy.radius - 2);
+  }
+
   return enemy;
+}
+
+/** Create 2 smaller non-elite copies for the 'splitting' elite modifier */
+export function createEliteSplitCopies(parent: Enemy, wave: number, difficultyConfig?: DifficultyConfig): Enemy[] {
+  const results: Enemy[] = [];
+  for (let i = 0; i < 2; i++) {
+    const offset = { x: (Math.random() - 0.5) * 30, y: (Math.random() - 0.5) * 30 };
+    const splitPos = { x: parent.pos.x + offset.x, y: parent.pos.y + offset.y };
+    const copy = createEnemy(parent.enemyType, splitPos, wave, difficultyConfig);
+    // Half HP and half XP, NOT elite
+    copy.health = Math.round(parent.maxHealth * 0.5 / 2.5); // undo the 2.5x elite HP boost, then halve
+    copy.maxHealth = copy.health;
+    copy.xpValue = Math.round(parent.xpValue * 0.5 / 3); // undo the 3x elite XP boost, then halve
+    copy.radius = Math.max(6, Math.round(parent.radius * 0.7));
+    copy.vel = vec2((Math.random() - 0.5) * 100, (Math.random() - 0.5) * 100);
+    results.push(copy);
+  }
+  return results;
 }
 
 // ── Spawning ────────────────────────────────────────────────────

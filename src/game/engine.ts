@@ -29,6 +29,7 @@ import {
   updateEnemies,
   shouldSpawnBoss,
   createSplitEnemies,
+  createEliteSplitCopies,
   createEnemy,
 } from './enemies';
 import {
@@ -656,6 +657,28 @@ export class GameEngine {
       }
     }
 
+    // 4b2. Elite modifier: regenerating heals 3 HP/s (capped at maxHealth)
+    for (const enemy of s.enemies) {
+      if (enemy.active && enemy.isElite && enemy.eliteModifier === 'regenerating') {
+        enemy.health = Math.min(enemy.maxHealth, enemy.health + 3 * dt);
+      }
+    }
+
+    // 4b3. Chronomancer time dilation aura: enemies within 200px move 25% slower
+    if (this.characterDef.id === 'chronomancer') {
+      const CHRONO_AURA_RADIUS = 200;
+      const CHRONO_SLOW_FACTOR = 0.25; // reduce movement by 25%
+      for (const enemy of s.enemies) {
+        if (!enemy.active) continue;
+        const dist = distance(enemy.pos, s.player.pos);
+        if (dist < CHRONO_AURA_RADIUS) {
+          // Undo 25% of this frame's movement (applied after updateEnemies)
+          enemy.pos.x -= enemy.vel.x * dt * this.enemyManager.waveSpeedMultiplier * CHRONO_SLOW_FACTOR;
+          enemy.pos.y -= enemy.vel.y * dt * this.enemyManager.waveSpeedMultiplier * CHRONO_SLOW_FACTOR;
+        }
+      }
+    }
+
     // 4c. Gravity well effects: pull enemies and deal tick damage
     for (const proj of s.projectiles) {
       if (!proj.active || !proj.isGravityWell) continue;
@@ -669,7 +692,12 @@ export class GameEngine {
           enemy.vel.y += dirToWell.y * pullStrength * dt;
           // Tick damage (with synergy bonus)
           const gwSynergyBonuses = computeSynergyBonuses(this.state.activeSynergies);
-          enemy.health -= proj.damage * dt * gwSynergyBonuses.damageMult;
+          let gwDamage = proj.damage * dt * gwSynergyBonuses.damageMult;
+          // Elite modifier: armored takes 40% less damage
+          if (enemy.isElite && enemy.eliteModifier === 'armored') {
+            gwDamage *= 0.6;
+          }
+          enemy.health -= gwDamage;
           if (enemy.health <= 0) {
             this.killEnemy(enemy);
           }
@@ -1061,6 +1089,11 @@ export class GameEngine {
             this.particles.emit(enemy.pos.x, enemy.pos.y, 2, '#44aaff', 40, 0.15);
           }
 
+          // Elite modifier: armored takes 40% less damage
+          if (enemy.isElite && enemy.eliteModifier === 'armored') {
+            actualDamage = Math.floor(actualDamage * 0.6);
+          }
+
           enemy.health -= actualDamage;
           this.damageDealt += actualDamage;
           this.particles.emitDamageNumber(
@@ -1079,9 +1112,14 @@ export class GameEngine {
               if (!other.active || other.id === enemy.id) continue;
               const aoeDist = distance(proj.pos, other.pos);
               if (aoeDist < proj.aoe.radius) {
-                other.health -= aoeDamage;
-                this.damageDealt += aoeDamage;
-                this.particles.emitDamageNumber(other.pos.x, other.pos.y, aoeDamage, this.getComboColor());
+                let aoeActual = aoeDamage;
+                // Elite modifier: armored takes 40% less damage
+                if (other.isElite && other.eliteModifier === 'armored') {
+                  aoeActual = Math.floor(aoeActual * 0.6);
+                }
+                other.health -= aoeActual;
+                this.damageDealt += aoeActual;
+                this.particles.emitDamageNumber(other.pos.x, other.pos.y, aoeActual, this.getComboColor());
                 this.particles.emit(other.pos.x, other.pos.y, 3, proj.color, 40, 0.15);
                 if (other.health <= 0) {
                   this.killEnemy(other);
@@ -1124,6 +1162,13 @@ export class GameEngine {
       const dist = distance(enemy.pos, s.player.pos);
       if (dist < enemy.radius + s.player.radius) {
         this.damagePlayer(enemy.damage);
+
+        // Elite modifier: vampiric heals for 50% of damage dealt on hit
+        if (enemy.isElite && enemy.eliteModifier === 'vampiric') {
+          const healAmount = Math.floor(enemy.damage * 0.5);
+          enemy.health = Math.min(enemy.maxHealth, enemy.health + healAmount);
+          this.particles.emit(enemy.pos.x, enemy.pos.y, 3, '#880022', 40, 0.2);
+        }
 
         const pushDir = normalize(sub(enemy.pos, s.player.pos));
         enemy.pos.x += pushDir.x * 5;
@@ -1171,6 +1216,14 @@ export class GameEngine {
       const splits = createSplitEnemies(enemy.pos, this.state.wave, this.difficultyConfig);
       for (const e of splits) e.spawnTime = this.state.time;
       this.state.enemies.push(...splits);
+    }
+
+    // Elite modifier: splitting spawns 2 smaller non-elite copies on death
+    if (enemy.isElite && enemy.eliteModifier === 'splitting') {
+      const copies = createEliteSplitCopies(enemy, this.state.wave, this.difficultyConfig);
+      for (const e of copies) e.spawnTime = this.state.time;
+      this.state.enemies.push(...copies);
+      this.particles.emit(enemy.pos.x, enemy.pos.y, 6, '#ffd700', 60, 0.3);
     }
 
     this.enemiesKilled++;
@@ -1263,8 +1316,18 @@ export class GameEngine {
       );
       this.state.screenShake = 15;
 
-      // Drop random loot
+      // Drop random loot (boss: 100%)
       this.spawnLootDrop(enemy.pos.x, enemy.pos.y);
+    } else if (enemy.enemyType === 'tank' || enemy.enemyType === 'splitter') {
+      // Elite enemies: 10% chance to drop loot
+      if (Math.random() < 0.10) {
+        this.spawnLootDrop(enemy.pos.x, enemy.pos.y);
+      }
+    } else {
+      // Regular enemies: 2% chance to drop loot
+      if (Math.random() < 0.02) {
+        this.spawnLootDrop(enemy.pos.x, enemy.pos.y);
+      }
     }
 
     // Spawn 2-3 XP orbs spread around the death position
@@ -1391,12 +1454,17 @@ export class GameEngine {
         if (enemyDist >= hazard.radius + enemy.radius) continue;
 
         switch (hazard.type) {
-          case 'void_rift':
-            enemy.health -= 5 * dt;
+          case 'void_rift': {
+            let riftDmg = 5 * dt;
+            if (enemy.isElite && enemy.eliteModifier === 'armored') {
+              riftDmg *= 0.6;
+            }
+            enemy.health -= riftDmg;
             if (enemy.health <= 0) {
               this.killEnemy(enemy);
             }
             break;
+          }
           case 'plasma_pool': {
             const slowFactor = Math.max(0, 1 - 0.5 * dt * 10);
             enemy.vel.x *= slowFactor;
@@ -1646,6 +1714,9 @@ export class GameEngine {
     }
 
     if (s.player.active) {
+      if (this.characterDef.id === 'chronomancer') {
+        r.drawChronomancerAura(s.player, s.time);
+      }
       r.drawPlayer(s.player, s.time);
       r.drawOrbitShield(s.player, s.player.abilities, s.time);
     }

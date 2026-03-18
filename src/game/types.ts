@@ -32,6 +32,8 @@ export interface Player extends Entity {
 
 export type EnemyType = 'chaser' | 'shooter' | 'swarm' | 'tank' | 'splitter' | 'boss' | 'phantom' | 'shielder';
 
+export type EliteModifier = 'swift' | 'regenerating' | 'splitting' | 'vampiric' | 'armored';
+
 export interface Enemy extends Entity {
   speed: number;
   damage: number;
@@ -42,6 +44,7 @@ export interface Enemy extends Entity {
   phaseOffset?: number;
   rotation?: number;
   isElite?: boolean;
+  eliteModifier?: EliteModifier;
   spawnTime?: number;
   phaseTimer?: number;
   phaseState?: 'visible' | 'fading_out' | 'invisible' | 'fading_in';

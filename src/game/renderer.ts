@@ -614,6 +614,37 @@ export class Renderer {
     ctx.globalCompositeOperation = 'source-over';
   }
 
+  // ── Chronomancer Time Dilation Aura ──────────────────────────────
+
+  drawChronomancerAura(player: Player, gameTime: number): void {
+    const ctx = this.ctx;
+    const { x, y } = player.pos;
+    const AURA_RADIUS = 200;
+
+    ctx.save();
+
+    // Subtle pulsing fill
+    const pulse = 1 + Math.sin(gameTime * 2) * 0.02;
+    const fillAlpha = 0.06 + Math.sin(gameTime * 3) * 0.02;
+    const grad = ctx.createRadialGradient(x, y, 0, x, y, AURA_RADIUS * pulse);
+    grad.addColorStop(0, `rgba(0, 255, 170, ${fillAlpha})`);
+    grad.addColorStop(0.7, `rgba(0, 204, 136, ${fillAlpha * 0.5})`);
+    grad.addColorStop(1, 'rgba(0, 204, 136, 0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(x, y, AURA_RADIUS * pulse, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Thin teal border
+    ctx.strokeStyle = `rgba(0, 255, 170, 0.15)`;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(x, y, AURA_RADIUS * pulse, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
   // ── Orbit Shield Visual ────────────────────────────────────────
 
   drawOrbitShield(player: Player, abilities: Ability[], gameTime: number): void {
@@ -965,6 +996,90 @@ export class Renderer {
       ctx.lineTo(x + crownW, crownY);
       ctx.closePath();
       ctx.fill();
+    }
+
+    // Elite modifier visual indicators (subtle)
+    if (enemy.isElite && enemy.eliteModifier) {
+      switch (enemy.eliteModifier) {
+        case 'swift': {
+          // Speed lines behind the enemy (2-3 short dashes)
+          const speed = Math.sqrt(enemy.vel.x * enemy.vel.x + enemy.vel.y * enemy.vel.y);
+          if (speed > 10) {
+            const dirX = -enemy.vel.x / speed;
+            const dirY = -enemy.vel.y / speed;
+            ctx.strokeStyle = 'rgba(255, 255, 200, 0.4)';
+            ctx.lineWidth = 1.5;
+            for (let i = 0; i < 3; i++) {
+              const offset = (i - 1) * 5;
+              const perpX = -dirY * offset;
+              const perpY = dirX * offset;
+              const startDist = enemy.radius + 4 + i * 3;
+              const lineLen = 8 + i * 2;
+              ctx.beginPath();
+              ctx.moveTo(x + dirX * startDist + perpX, y + dirY * startDist + perpY);
+              ctx.lineTo(x + dirX * (startDist + lineLen) + perpX, y + dirY * (startDist + lineLen) + perpY);
+              ctx.stroke();
+            }
+          }
+          break;
+        }
+        case 'regenerating': {
+          // Green + symbol floating above
+          const bobY = y - enemy.radius - 18 + Math.sin(gameTime * 3) * 3;
+          ctx.strokeStyle = 'rgba(0, 220, 80, 0.7)';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(x, bobY - 4);
+          ctx.lineTo(x, bobY + 4);
+          ctx.moveTo(x - 4, bobY);
+          ctx.lineTo(x + 4, bobY);
+          ctx.stroke();
+          break;
+        }
+        case 'splitting': {
+          // Two small dots orbiting the enemy
+          for (let i = 0; i < 2; i++) {
+            const orbitAngle = gameTime * 4 + i * Math.PI;
+            const orbitDist = enemy.radius + 6;
+            const dotX = x + Math.cos(orbitAngle) * orbitDist;
+            const dotY = y + Math.sin(orbitAngle) * orbitDist;
+            ctx.fillStyle = 'rgba(255, 215, 0, 0.6)';
+            ctx.beginPath();
+            ctx.arc(dotX, dotY, 2, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          break;
+        }
+        case 'vampiric': {
+          // Dark red aura ring
+          ctx.strokeStyle = 'rgba(140, 0, 20, 0.35)';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.arc(x, y, enemy.radius + 4, 0, Math.PI * 2);
+          ctx.stroke();
+          // Inner subtle fill
+          ctx.fillStyle = 'rgba(140, 0, 20, 0.08)';
+          ctx.beginPath();
+          ctx.arc(x, y, enemy.radius + 4, 0, Math.PI * 2);
+          ctx.fill();
+          break;
+        }
+        case 'armored': {
+          // Thicker border/outline
+          ctx.strokeStyle = 'rgba(180, 180, 200, 0.6)';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.arc(x, y, enemy.radius + 2, 0, Math.PI * 2);
+          ctx.stroke();
+          // Second inner ring for layered look
+          ctx.strokeStyle = 'rgba(180, 180, 200, 0.3)';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.arc(x, y, enemy.radius + 5, 0, Math.PI * 2);
+          ctx.stroke();
+          break;
+        }
+      }
     }
 
     // Low health warning flash
@@ -2138,55 +2253,58 @@ export class Renderer {
   // ── Minimap ──────────────────────────────────────────────────
 
   private drawMinimap(state: GameState, worldSize: number): void {
+    // Don't draw when paused or showing upgrade screen
+    if (state.paused || state.showUpgradeScreen) return;
+
     const ctx = this.ctx;
-    const size = 140;
-    const margin = 15;
+    const size = 120;
+    const margin = 8;
     const mx = this.width - size - margin;
-    const my = this.height - size - margin;
+    const my = margin;
     const scale = size / worldSize;
 
     // Background
-    ctx.fillStyle = 'rgba(5, 5, 15, 0.7)';
+    ctx.globalAlpha = 0.75;
+    ctx.fillStyle = '#05050f';
     ctx.fillRect(mx, my, size, size);
+    ctx.globalAlpha = 1;
 
-    // Border (neon cyan)
+    // Border (neon cyan, thin)
     ctx.strokeStyle = '#00ddff';
-    ctx.lineWidth = 1.5;
-    ctx.strokeRect(mx, my, size, size);
+    ctx.lineWidth = 1;
+    ctx.strokeRect(mx + 0.5, my + 0.5, size - 1, size - 1);
 
-    // XP orbs (tiny green dots)
+    // Hazards — purple dots (2px), batched
+    ctx.fillStyle = '#aa44ff';
+    ctx.globalAlpha = 0.8;
+    for (let i = 0; i < state.hazards.length; i++) {
+      const h = state.hazards[i];
+      if (!h.active) continue;
+      ctx.fillRect(mx + h.pos.x * scale - 1, my + h.pos.y * scale - 1, 2, 2);
+    }
+    ctx.globalAlpha = 1;
+
+    // Loot drops — green dots (2px), batched
     ctx.fillStyle = '#00ff88';
-    for (const orb of state.xpOrbs) {
-      if (!orb.active) continue;
-      const ox = mx + orb.pos.x * scale;
-      const oy = my + orb.pos.y * scale;
-      ctx.fillRect(ox - 1, oy - 1, 2, 2);
+    for (let i = 0; i < state.lootDrops.length; i++) {
+      const l = state.lootDrops[i];
+      if (!l.active) continue;
+      ctx.fillRect(mx + l.pos.x * scale - 1, my + l.pos.y * scale - 1, 2, 2);
     }
 
-    // Hazards (colored circles on minimap)
-    for (const hazard of state.hazards) {
-      if (!hazard.active) continue;
-      const hx = mx + hazard.pos.x * scale;
-      const hy = my + hazard.pos.y * scale;
-      const hr = Math.max(2, hazard.radius * scale);
-      switch (hazard.type) {
-        case 'void_rift': ctx.fillStyle = 'rgba(102, 0, 204, 0.5)'; break;
-        case 'plasma_pool': ctx.fillStyle = 'rgba(0, 255, 68, 0.5)'; break;
-        case 'gravity_anomaly': ctx.fillStyle = 'rgba(68, 136, 255, 0.5)'; break;
-      }
-      ctx.beginPath();
-      ctx.arc(hx, hy, hr, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // Enemies (small red dots)
+    // Enemies — red dots (1.5px) and boss yellow dots (3px)
+    // Batch regular enemies first, then bosses
     ctx.fillStyle = '#ff3344';
-    for (const enemy of state.enemies) {
-      if (!enemy.active) continue;
-      const ex = mx + enemy.pos.x * scale;
-      const ey = my + enemy.pos.y * scale;
-      const dotSize = enemy.enemyType === 'boss' ? 4 : 2;
-      ctx.fillRect(ex - dotSize / 2, ey - dotSize / 2, dotSize, dotSize);
+    for (let i = 0; i < state.enemies.length; i++) {
+      const e = state.enemies[i];
+      if (!e.active || e.enemyType === 'boss') continue;
+      ctx.fillRect(mx + e.pos.x * scale - 0.75, my + e.pos.y * scale - 0.75, 1.5, 1.5);
+    }
+    ctx.fillStyle = '#ffdd00';
+    for (let i = 0; i < state.enemies.length; i++) {
+      const e = state.enemies[i];
+      if (!e.active || e.enemyType !== 'boss') continue;
+      ctx.fillRect(mx + e.pos.x * scale - 1.5, my + e.pos.y * scale - 1.5, 3, 3);
     }
 
     // Viewport rectangle
@@ -2195,16 +2313,15 @@ export class Renderer {
     const vpY = my + (cam.y - this.height / 2) * scale;
     const vpW = this.width * scale;
     const vpH = this.height * scale;
-
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+    ctx.lineWidth = 0.5;
     ctx.strokeRect(vpX, vpY, vpW, vpH);
 
-    // Player (bright cyan dot)
+    // Player — bright cyan dot (3px)
     const px = mx + state.player.pos.x * scale;
     const py = my + state.player.pos.y * scale;
     ctx.fillStyle = '#00ffff';
-    ctx.fillRect(px - 2, py - 2, 4, 4);
+    ctx.fillRect(px - 1.5, py - 1.5, 3, 3);
   }
 
   // ── Wave Announcement ──────────────────────────────────────────

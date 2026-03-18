@@ -94,6 +94,24 @@ const CHARACTERS: CharacterDef[] = [
     unlockCondition: (stats) => stats.totalKills >= 2000 && stats.gamesPlayed >= 20,
     unlockDescription: 'Reach 2,000 kills and play 20 games.',
   },
+  {
+    id: 'chronomancer',
+    name: 'Chronomancer',
+    description: 'Time bender. Slows nearby enemies.',
+    color: '#00ffaa',
+    glowColor: '#00cc88',
+    icon: '\u{231B}', // hourglass
+    startingAbilityId: 'frost_aura',
+    baseHealth: 90,
+    baseSpeed: 180,
+    baseArmor: 1,
+    damageMultiplier: 1.0,
+    xpMultiplier: 1.1,
+    healthRegen: 0.1,
+    cooldownReduction: 0.95,
+    unlockCondition: (stats) => stats.totalKills >= 3000,
+    unlockDescription: 'Reach 3,000 total kills.',
+  },
 ];
 
 export function getCharacters(): CharacterDef[] {
