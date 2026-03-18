@@ -87,6 +87,10 @@
 - Damage flash: red screen edge vignette on hit, pulsing low health warning at <25% HP
 - Auto-Collect XP: toggle in settings, infinite magnet range for casual play
 - 21 game-over tips covering all v2.x features
+- Share card: canvas-generated neon stats image shared via Web Share API
+- First-run onboarding: progressive tutorial hints for new players (localStorage flag)
+- Smart PWA install prompt: shown after 2nd game over when installable
+- Fade transitions between all game screens
 
 ## Performance Rules
 - Never use `shadowBlur` in the render loop
