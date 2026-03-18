@@ -73,6 +73,7 @@ interface EngineCallbacks {
     combo: number;
     maxCombo: number;
     dashCooldown: number;
+    enemiesKilled: number;
   }) => void;
   onLevelUp: (
     choices: {
@@ -1489,6 +1490,17 @@ export class GameEngine {
     return undefined;
   }
 
+  private getWavePreview(wave: number): string {
+    const enemies: string[] = ['Chasers', 'Shooters'];
+    if (wave >= 2) enemies.push('Swarms');
+    if (wave >= 3) enemies.push('Tanks');
+    if (wave >= 3) enemies.push('Splitters');
+    if (wave >= 4) enemies.push('Shielders');
+    if (wave >= 5) enemies.push('Phantoms');
+    if (wave >= 5) enemies.push('BOSS');
+    return enemies.join(' · ');
+  }
+
   private checkWaveProgression(): void {
     const expectedWave = Math.floor(this.state.time / WAVE_DURATION) + 1;
     if (expectedWave > this.state.wave) {
@@ -1499,7 +1511,8 @@ export class GameEngine {
 
       // Determine wave event
       const eventName = this.getWaveEventName(expectedWave);
-      this.renderer?.announceWave(expectedWave, eventName);
+      const wavePreview = this.getWavePreview(expectedWave);
+      this.renderer?.announceWave(expectedWave, eventName, wavePreview);
       this.audio.setMusicIntensity(this.state.wave / 10);
 
       // Apply wave events
@@ -1638,6 +1651,7 @@ export class GameEngine {
       combo: this.comboCount,
       maxCombo: this.maxCombo,
       dashCooldown: Math.max(0, this.dashCooldown),
+      enemiesKilled: this.enemiesKilled,
     });
   }
 

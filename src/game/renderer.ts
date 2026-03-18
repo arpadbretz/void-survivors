@@ -107,6 +107,7 @@ export class Renderer {
   private waveAnnounceDuration: number = 3; // seconds
   private waveAnnounceActive: boolean = false;
   private waveAnnounceSubtitle: string | undefined = undefined;
+  private waveAnnouncePreview: string | undefined = undefined;
 
   // Tutorial hint system
   private tutorialHints: { text: string; time: number; duration: number }[] = [];
@@ -1827,11 +1828,12 @@ export class Renderer {
     }
   }
 
-  announceWave(wave: number, subtitle?: string): void {
+  announceWave(wave: number, subtitle?: string, preview?: string): void {
     this.waveAnnounceWave = wave;
     this.waveAnnounceTime = performance.now() / 1000;
     this.waveAnnounceActive = true;
     this.waveAnnounceSubtitle = subtitle;
+    this.waveAnnouncePreview = preview;
 
     // Trigger wave pulse effect
     this.wavePulseActive = true;
@@ -2243,6 +2245,17 @@ export class Renderer {
       ctx.fillStyle = '#ffd700';
       ctx.font = 'bold 28px monospace';
       ctx.fillText(this.waveAnnounceSubtitle, this.width / 2, this.height / 2 + 10);
+    }
+
+    // Enemy preview line
+    if (this.waveAnnouncePreview) {
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = 'rgba(224, 224, 240, 0.5)';
+      ctx.font = '14px monospace';
+      const previewY = this.waveAnnounceSubtitle
+        ? this.height / 2 + 40
+        : this.height / 2 + 10;
+      ctx.fillText(this.waveAnnouncePreview, this.width / 2, previewY);
     }
 
     ctx.shadowBlur = 0;

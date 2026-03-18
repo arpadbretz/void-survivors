@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 
 // ---------------------------------------------------------------------------
 // Types for the engine callbacks
@@ -20,6 +20,7 @@ interface HUDState {
   combo: number;
   maxCombo: number;
   dashCooldown: number;
+  enemiesKilled: number;
 }
 
 interface GameOverStats {
@@ -180,6 +181,7 @@ export default function PlayPage() {
     combo: 0,
     maxCombo: 0,
     dashCooldown: 0,
+    enemiesKilled: 0,
   });
   const [upgradeChoices, setUpgradeChoices] = useState<UpgradeChoice[]>([]);
   const [gameOverStats, setGameOverStats] = useState<GameOverStats | null>(
@@ -2952,10 +2954,16 @@ export default function PlayPage() {
                 </div>
                 <div
                   style={{
-                    fontSize: "0.8rem",
-                    color: "rgba(224,224,240,0.6)",
-                    lineHeight: 1.55,
+                    fontSize: "0.82rem",
+                    color: "rgba(224,224,240,0.85)",
+                    lineHeight: 1.6,
                     marginBottom: 8,
+                    padding: "6px 8px",
+                    borderRadius: 6,
+                    background: "rgba(0,238,255,0.04)",
+                    border: "1px solid rgba(0,238,255,0.08)",
+                    fontFamily: "var(--font-geist-mono), monospace",
+                    textShadow: "0 0 8px rgba(0,240,255,0.15)",
                   }}
                 >
                   {choice.description}
@@ -2999,7 +3007,46 @@ export default function PlayPage() {
       )}
 
       {/* ============== Pause Menu Overlay ============== */}
-      {screen === "paused" && (
+      {screen === "paused" && (() => {
+        const pauseMono = "var(--font-geist-mono), monospace";
+        const pauseCyan = "#00f0ff";
+        const pauseDimWhite = "rgba(224,224,240,0.55)";
+        const pauseSectionStyle: React.CSSProperties = {
+          border: "1px solid rgba(0,238,255,0.15)",
+          borderRadius: 12,
+          padding: isMobile ? "12px 14px" : "14px 20px",
+          background: "rgba(0,238,255,0.03)",
+          backdropFilter: "blur(4px)",
+          width: "100%",
+          maxWidth: 380,
+        };
+        // Detect active synergies from current abilities
+        const abilityIds = hud.abilities.map(a => {
+          // Map ability name to id format
+          return a.name.toLowerCase().replace(/\s+/g, '_');
+        });
+        const activeSynergies = (() => {
+          try {
+            // Inline synergy detection since we can't async-import in render
+            const SYNERGY_PAIRS: { name: string; icon: string; color: string; required: string[] }[] = [
+              { name: "Elemental Storm", icon: "\u26A1", color: "#00ccff", required: ["chain_lightning", "frost_aura"] },
+              { name: "Bullet Hell", icon: "\uD83D\uDD2B", color: "#ff4488", required: ["radial_shot", "auto_cannon"] },
+              { name: "Artillery Command", icon: "\uD83C\uDF1F", color: "#ff8800", required: ["missile_swarm", "gravity_well"] },
+              { name: "Cosmic Barrier", icon: "\uD83D\uDEE1\uFE0F", color: "#aaddff", required: ["orbit_shield", "frost_aura"] },
+              { name: "Rapid Fire", icon: "\u26A1", color: "#ffcc00", required: ["auto_cannon", "xp_magnet"] },
+              { name: "Death Zone", icon: "\u2620\uFE0F", color: "#9944ff", required: ["gravity_well", "chain_lightning"] },
+              { name: "Nova Cascade", icon: "\uD83D\uDD25", color: "#ff4466", required: ["radial_shot", "plasma_wave"] },
+            ];
+            const owned = new Set(abilityIds);
+            return SYNERGY_PAIRS.filter(s => s.required.every(id => owned.has(id)));
+          } catch {
+            return [];
+          }
+        })();
+        // Find character info
+        const currentChar = characterDefs.find(c => c.id === selectedCharacter);
+
+        return (
         <div
           style={{
             position: "absolute",
@@ -3007,56 +3054,253 @@ export default function PlayPage() {
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
-            justifyContent: "center",
+            justifyContent: isMobile ? "flex-start" : "center",
             zIndex: 30,
-            background: "rgba(10, 10, 18, 0.75)",
-            backdropFilter: "blur(6px)",
+            background: "rgba(10, 10, 18, 0.82)",
+            backdropFilter: "blur(8px)",
+            overflowY: "auto",
+            WebkitOverflowScrolling: "touch",
           }}
         >
-          <div className="animate-scale-in" style={{ textAlign: "center" }}>
+          <div className="animate-scale-in" style={{
+            textAlign: "center",
+            padding: isMobile ? "24px 16px 40px" : "32px 24px 40px",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 14,
+            maxWidth: 420,
+            width: "100%",
+          }}>
             <h2
               style={{
-                fontSize: "clamp(2.5rem, 6vw, 4rem)",
+                fontSize: "clamp(2.2rem, 5vw, 3.2rem)",
                 fontWeight: 900,
-                color: "#00f0ff",
+                color: pauseCyan,
                 letterSpacing: "0.15em",
-                marginBottom: 48,
-                textShadow: `
-                  0 0 10px #00f0ff,
-                  0 0 30px #00f0ff,
-                  0 0 60px rgba(0,240,255,0.4)
-                `,
+                marginBottom: 4,
+                textShadow: "0 0 10px #00f0ff, 0 0 30px #00f0ff, 0 0 60px rgba(0,240,255,0.4)",
               }}
             >
               PAUSED
             </h2>
 
+            {/* Character badge */}
+            {currentChar && (
+              <div style={{
+                fontSize: "0.82rem",
+                color: currentChar.color,
+                fontFamily: pauseMono,
+                letterSpacing: "0.06em",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+              }}>
+                <span style={{ fontSize: "1.1rem" }}>{currentChar.icon}</span>
+                <span style={{ fontWeight: 700 }}>{currentChar.name}</span>
+              </div>
+            )}
+
+            {/* Run Stats Section */}
+            <div style={pauseSectionStyle}>
+              <div style={{
+                fontSize: "0.65rem",
+                fontWeight: 700,
+                letterSpacing: "0.18em",
+                color: "rgba(224,224,240,0.4)",
+                marginBottom: 8,
+                textTransform: "uppercase",
+              }}>
+                Run Stats
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 16px" }}>
+                {[
+                  { label: "Wave", value: hud.wave, color: pauseCyan },
+                  { label: "Level", value: hud.level, color: pauseCyan },
+                  { label: "Score", value: hud.score.toLocaleString(), color: "#ffd700" },
+                  { label: "Kills", value: hud.enemiesKilled.toLocaleString(), color: "#ff00aa" },
+                ].map((stat) => (
+                  <div key={stat.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "2px 0" }}>
+                    <span style={{ color: pauseDimWhite, fontSize: isMobile ? "0.76rem" : "0.82rem" }}>{stat.label}</span>
+                    <span style={{ color: stat.color, fontFamily: pauseMono, fontSize: isMobile ? "0.8rem" : "0.88rem", fontWeight: 600 }}>{stat.value}</span>
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "2px 0", marginTop: 2 }}>
+                <span style={{ color: pauseDimWhite, fontSize: isMobile ? "0.76rem" : "0.82rem" }}>Time Survived</span>
+                <span style={{ color: pauseCyan, fontFamily: pauseMono, fontSize: isMobile ? "0.8rem" : "0.88rem", fontWeight: 600 }}>{formatTime(hud.time)}</span>
+              </div>
+            </div>
+
+            {/* Active Abilities */}
+            {hud.abilities.length > 0 && (
+              <div style={pauseSectionStyle}>
+                <div style={{
+                  fontSize: "0.65rem",
+                  fontWeight: 700,
+                  letterSpacing: "0.18em",
+                  color: "rgba(224,224,240,0.4)",
+                  marginBottom: 8,
+                  textTransform: "uppercase",
+                }}>
+                  Active Abilities
+                </div>
+                <div style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: 8,
+                  justifyContent: "center",
+                }}>
+                  {hud.abilities.map((ability, i) => (
+                    <div key={i} style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 5,
+                      padding: "4px 10px",
+                      borderRadius: 8,
+                      border: `1px solid ${ability.color}33`,
+                      background: `${ability.color}0a`,
+                    }}>
+                      <span style={{ fontSize: "1rem" }}>{ability.icon}</span>
+                      <span style={{
+                        fontSize: "0.72rem",
+                        color: ability.color,
+                        fontFamily: pauseMono,
+                        fontWeight: 600,
+                      }}>
+                        Lv.{ability.level}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Active Synergies */}
+            {activeSynergies.length > 0 && (
+              <div style={{
+                ...pauseSectionStyle,
+                borderColor: "rgba(255,215,0,0.2)",
+                background: "rgba(255,215,0,0.03)",
+              }}>
+                <div style={{
+                  fontSize: "0.65rem",
+                  fontWeight: 700,
+                  letterSpacing: "0.18em",
+                  color: "rgba(255,215,0,0.55)",
+                  marginBottom: 8,
+                  textTransform: "uppercase",
+                }}>
+                  Active Synergies
+                </div>
+                <div style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: 6,
+                  justifyContent: "center",
+                }}>
+                  {activeSynergies.map((syn, i) => (
+                    <div key={i} style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 5,
+                      padding: "4px 10px",
+                      borderRadius: 8,
+                      border: `1px solid ${syn.color}44`,
+                      background: `${syn.color}0d`,
+                    }}>
+                      <span style={{ fontSize: "0.9rem" }}>{syn.icon}</span>
+                      <span style={{
+                        fontSize: "0.72rem",
+                        color: syn.color,
+                        fontFamily: pauseMono,
+                        fontWeight: 600,
+                      }}>
+                        {syn.name}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* How to Play */}
+            <div style={{
+              ...pauseSectionStyle,
+              borderColor: "rgba(170,68,255,0.15)",
+              background: "rgba(170,68,255,0.03)",
+            }}>
+              <div style={{
+                fontSize: "0.65rem",
+                fontWeight: 700,
+                letterSpacing: "0.18em",
+                color: "rgba(170,68,255,0.55)",
+                marginBottom: 8,
+                textTransform: "uppercase",
+              }}>
+                Controls
+              </div>
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: "auto 1fr",
+                gap: "4px 12px",
+                fontSize: "0.78rem",
+              }}>
+                {[
+                  { key: "WASD", action: "Move" },
+                  { key: "SPACE", action: "Dash" },
+                  { key: "P / ESC", action: "Pause" },
+                ].map(({ key, action }) => (
+                  <React.Fragment key={key}>
+                    <span style={{
+                      color: "#aa44ff",
+                      fontFamily: pauseMono,
+                      fontWeight: 700,
+                      fontSize: "0.72rem",
+                      padding: "2px 8px",
+                      borderRadius: 4,
+                      background: "rgba(170,68,255,0.1)",
+                      border: "1px solid rgba(170,68,255,0.2)",
+                      textAlign: "center",
+                    }}>
+                      {key}
+                    </span>
+                    <span style={{ color: pauseDimWhite, textAlign: "left", lineHeight: "1.8" }}>
+                      {action}
+                    </span>
+                  </React.Fragment>
+                ))}
+              </div>
+            </div>
+
+            {/* Action Buttons */}
             <div
               style={{
                 display: "flex",
                 flexDirection: "column",
-                gap: 14,
+                gap: 10,
                 alignItems: "center",
+                marginTop: 4,
               }}
             >
               <button
                 className="btn-neon-filled"
                 onClick={resumeGame}
-                style={{ fontSize: "1.2rem", padding: "14px 56px", minWidth: 220 }}
+                style={{ fontSize: "1.1rem", padding: "12px 48px", minWidth: 220 }}
               >
                 RESUME
               </button>
               <button
                 className="btn-neon"
                 onClick={restartGame}
-                style={{ fontSize: "1rem", padding: "12px 48px", minWidth: 220 }}
+                style={{ fontSize: "0.95rem", padding: "10px 40px", minWidth: 220 }}
               >
                 RESTART
               </button>
               <button
                 className="btn-neon"
                 onClick={backToMenu}
-                style={{ fontSize: "1rem", padding: "12px 48px", minWidth: 220 }}
+                style={{ fontSize: "0.95rem", padding: "10px 40px", minWidth: 220 }}
               >
                 MAIN MENU
               </button>
@@ -3066,21 +3310,21 @@ export default function PlayPage() {
                   setSettingsReturnScreen("paused");
                   setScreen("settings");
                 }}
-                style={{ fontSize: "1rem", padding: "12px 48px", minWidth: 220 }}
+                style={{ fontSize: "0.95rem", padding: "10px 40px", minWidth: 220 }}
               >
                 SETTINGS
               </button>
               <button
                 onClick={toggleSound}
                 style={{
-                  marginTop: 8,
+                  marginTop: 4,
                   background: "rgba(255,255,255,0.05)",
                   border: "1px solid rgba(255,255,255,0.15)",
                   borderRadius: 8,
                   color: "rgba(224, 224, 240, 0.6)",
-                  padding: "10px 24px",
+                  padding: "8px 24px",
                   cursor: "pointer",
-                  fontSize: "0.9rem",
+                  fontSize: "0.85rem",
                   minWidth: 220,
                   backdropFilter: "blur(4px)",
                 }}
@@ -3091,9 +3335,9 @@ export default function PlayPage() {
 
             <p
               style={{
-                color: "rgba(224, 224, 240, 0.3)",
-                fontSize: "0.8rem",
-                marginTop: 32,
+                color: "rgba(224, 224, 240, 0.25)",
+                fontSize: "0.75rem",
+                marginTop: 8,
                 letterSpacing: "0.08em",
               }}
             >
@@ -3101,7 +3345,8 @@ export default function PlayPage() {
             </p>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* ============== Settings Screen ============== */}
       {screen === "settings" && (
@@ -3664,6 +3909,13 @@ export default function PlayPage() {
             </span>
           </div>
         );
+        const goCharDef = characterDefs.find(c => c.id === selectedCharacter);
+        // Find the highest-level ability name from the abilitiesUsed list
+        // Since we only have names, show the last one (typically highest level acquired last)
+        // Use hud.abilities which still has the last state's abilities with levels
+        const bestAbility = hud.abilities.length > 0
+          ? hud.abilities.reduce((best, cur) => cur.level > best.level ? cur : best, hud.abilities[0])
+          : null;
 
         return (
         <div
@@ -3707,6 +3959,54 @@ export default function PlayPage() {
               GAME OVER
             </h2>
 
+            {/* Character + Difficulty Badge */}
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              flexWrap: "wrap",
+              justifyContent: "center",
+            }}>
+              {goCharDef && (
+                <div style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 5,
+                  padding: "4px 12px",
+                  borderRadius: 8,
+                  border: `1px solid ${goCharDef.color}44`,
+                  background: `${goCharDef.color}0a`,
+                }}>
+                  <span style={{ fontSize: "1rem" }}>{goCharDef.icon}</span>
+                  <span style={{
+                    fontSize: "0.78rem",
+                    color: goCharDef.color,
+                    fontFamily: mono,
+                    fontWeight: 700,
+                  }}>
+                    {goCharDef.name}
+                  </span>
+                </div>
+              )}
+              <div style={{
+                padding: "4px 14px",
+                borderRadius: 8,
+                border: `1px solid ${diffColor}55`,
+                background: `${diffColor}0d`,
+              }}>
+                <span style={{
+                  fontSize: "0.78rem",
+                  color: diffColor,
+                  fontFamily: mono,
+                  fontWeight: 800,
+                  letterSpacing: "0.1em",
+                  textShadow: `0 0 8px ${diffGlow}`,
+                }}>
+                  {(gameOverStats.difficulty || "Normal").toUpperCase()}
+                </span>
+              </div>
+            </div>
+
             {/* Run summary line */}
             <div style={{
               fontSize: isMobile ? "0.82rem" : "0.9rem",
@@ -3737,22 +4037,19 @@ export default function PlayPage() {
               }}>
                 {gameOverStats.score.toLocaleString()}
               </div>
-              <div style={{ display: "flex", justifyContent: "center", gap: 12, marginTop: 4, fontSize: "0.78rem" }}>
-                {gameOverStats.difficulty && gameOverStats.difficulty !== "Normal" && (
+              {gameOverStats.scoreMult !== 1 && (
+                <div style={{ display: "flex", justifyContent: "center", gap: 12, marginTop: 4, fontSize: "0.78rem" }}>
                   <span style={{
                     color: diffColor,
                     fontFamily: mono,
-                    fontWeight: 700,
-                    letterSpacing: "0.08em",
-                    textShadow: `0 0 8px ${diffGlow}`,
+                    fontWeight: 600,
+                    letterSpacing: "0.06em",
+                    opacity: 0.7,
                   }}>
-                    {gameOverStats.difficulty.toUpperCase()}
-                    {gameOverStats.scoreMult !== 1 && (
-                      <span style={{ opacity: 0.7, marginLeft: 4 }}>({gameOverStats.scoreMult}x)</span>
-                    )}
+                    Score Multiplier: {gameOverStats.scoreMult}x
                   </span>
-                )}
-              </div>
+                </div>
+              )}
               {isNewBest && (
                 <div style={{
                   marginTop: 8,
@@ -3870,6 +4167,49 @@ export default function PlayPage() {
                 </div>
               )}
             </div>
+
+            {/* Best Ability Highlight */}
+            {bestAbility && (
+              <div style={{
+                ...sectionStyle,
+                borderColor: "rgba(255,215,0,0.25)",
+                background: "linear-gradient(135deg, rgba(255,215,0,0.04), rgba(255,170,0,0.02))",
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                padding: isMobile ? "12px 16px" : "14px 20px",
+              }}>
+                <span style={{ fontSize: "1.6rem" }}>{bestAbility.icon}</span>
+                <div style={{ textAlign: "left" }}>
+                  <div style={{
+                    fontSize: "0.65rem",
+                    fontWeight: 700,
+                    letterSpacing: "0.15em",
+                    color: "rgba(255,215,0,0.5)",
+                    textTransform: "uppercase",
+                    marginBottom: 2,
+                  }}>
+                    Best Ability
+                  </div>
+                  <div style={{
+                    fontSize: "0.92rem",
+                    fontWeight: 700,
+                    color: bestAbility.color,
+                    fontFamily: mono,
+                  }}>
+                    {bestAbility.name}
+                    <span style={{
+                      marginLeft: 8,
+                      fontSize: "0.78rem",
+                      color: "#ffd700",
+                      fontWeight: 600,
+                    }}>
+                      Lv.{bestAbility.level}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Void Essence Earned */}
             {lastEssenceEarned > 0 && (
