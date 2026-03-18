@@ -17,12 +17,16 @@ function getRedis(): Redis | null {
   const url = process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
 
-  if (!url || !token) return null;
+  if (!url || !token) {
+    console.error('Leaderboard: Missing env vars', { hasUrl: !!url, hasToken: !!token });
+    return null;
+  }
 
   try {
     redis = new Redis({ url, token });
     return redis;
-  } catch {
+  } catch (err) {
+    console.error('Leaderboard: Redis init failed', err);
     return null;
   }
 }
