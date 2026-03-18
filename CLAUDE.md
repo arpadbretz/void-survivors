@@ -25,7 +25,7 @@
 - `particles.ts` — Object-pooled particle system
 - `types.ts` — All TypeScript interfaces (Entity, Player, Enemy, Projectile, Particle, XPOrb, Ability, GameState, etc.)
 - `math.ts` — Vector2 utilities (vec2, sub, normalize, distance, clamp, lerp, angle)
-- `achievements.ts` — 40 achievements, 4 tiers (bronze/silver/gold/platinum)
+- `achievements.ts` — 40 achievements, 4 tiers (bronze/silver/gold/platinum), 6 with trail color rewards
 - `stats.ts` — Persistent lifetime stats
 - `meta.ts` — Meta-progression currency and upgrades
 - `characters.ts` — 4 playable characters with unique stats (Void Walker, Phantom, Sentinel, Arcanist)
@@ -69,6 +69,11 @@
 - Player name prompt on first game over for leaderboard
 - 11 abilities: radial_shot, auto_cannon, orbit_shield, chain_lightning, frost_aura, missile_swarm, life_drain, xp_magnet, speed_boost, gravity_well, plasma_wave
 - 6 evolutions: Nova Burst, Railgun, Thunder Storm, Void Artillery, Singularity, Supernova
+- Shielder enemy: protective aura reduces nearby enemy damage by 50%
+- Achievement rewards: 6 unlockable trail colors (Crimson, Golden, Violet, Inferno, Prismatic, Void)
+- Passive XP trickle scales with wave, wave completion bonus XP
+- Game over tips: 14 random gameplay tips shown after each run
+- Wave announcement shows enemy type preview
 
 ## Performance Rules
 - Never use `shadowBlur` in the render loop
