@@ -639,7 +639,24 @@ export class GameEngine {
       }
     }
 
-    // 4b. Gravity well effects: pull enemies and deal tick damage
+    // 4b. Boss enrage: if a boss has been alive > 45 seconds, enrage it
+    for (const enemy of s.enemies) {
+      if (
+        enemy.active &&
+        enemy.enemyType === 'boss' &&
+        !enemy.isEnraged &&
+        enemy.spawnTime !== undefined &&
+        s.time - enemy.spawnTime > 45
+      ) {
+        enemy.isEnraged = true;
+        enemy.speed *= 1.5;
+        enemy.damage = Math.floor(enemy.damage * 1.3);
+        this.renderer?.announceStreak('BOSS ENRAGED!', '#ff2200');
+        this.particles.emitExplosion(enemy.pos.x, enemy.pos.y, '#ff2200', 20);
+      }
+    }
+
+    // 4c. Gravity well effects: pull enemies and deal tick damage
     for (const proj of s.projectiles) {
       if (!proj.active || !proj.isGravityWell) continue;
       for (const enemy of s.enemies) {
@@ -834,9 +851,9 @@ export class GameEngine {
     const s = this.state;
     const synBonuses = computeSynergyBonuses(s.activeSynergies);
     for (const ability of s.player.abilities) {
-      // Apply synergy cooldown multiplier temporarily
+      // Apply synergy cooldown multiplier and character cooldown reduction multiplicatively
       const originalCooldown = ability.cooldown;
-      ability.cooldown *= synBonuses.cooldownMult;
+      ability.cooldown *= synBonuses.cooldownMult * this.characterDef.cooldownReduction;
 
       const newProj = ability.onUpdate(
         s.player,

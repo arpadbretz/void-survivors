@@ -16,6 +16,7 @@ export interface CharacterDef {
   damageMultiplier: number;
   xpMultiplier: number;
   healthRegen: number; // HP per second, 0 for none
+  cooldownReduction: number; // multiplier applied to all ability cooldowns (1.0 = no change, 0.85 = 15% faster)
   unlockCondition: (stats: { totalKills: number; gamesPlayed: number }) => boolean;
   unlockDescription: string;
 }
@@ -35,6 +36,7 @@ const CHARACTERS: CharacterDef[] = [
     damageMultiplier: 1.0,
     xpMultiplier: 1.0,
     healthRegen: 0,
+    cooldownReduction: 1.0,
     unlockCondition: () => true,
     unlockDescription: 'Always unlocked.',
   },
@@ -52,6 +54,7 @@ const CHARACTERS: CharacterDef[] = [
     damageMultiplier: 1.15,
     xpMultiplier: 1.2,
     healthRegen: 0,
+    cooldownReduction: 1.0,
     unlockCondition: (stats) => stats.totalKills >= 500,
     unlockDescription: 'Reach 500 total kills.',
   },
@@ -69,6 +72,7 @@ const CHARACTERS: CharacterDef[] = [
     damageMultiplier: 1.0,
     xpMultiplier: 1.0,
     healthRegen: 0.2, // 1 HP per 5 seconds
+    cooldownReduction: 1.0,
     unlockCondition: (stats) => stats.gamesPlayed >= 10,
     unlockDescription: 'Play 10 games.',
   },
@@ -86,6 +90,7 @@ const CHARACTERS: CharacterDef[] = [
     damageMultiplier: 1.25,
     xpMultiplier: 0.9,
     healthRegen: 0,
+    cooldownReduction: 0.85,
     unlockCondition: (stats) => stats.totalKills >= 2000 && stats.gamesPlayed >= 20,
     unlockDescription: 'Reach 2,000 kills and play 20 games.',
   },

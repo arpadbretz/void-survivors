@@ -763,6 +763,11 @@ export class Renderer {
       color = '#ffd700';
     }
 
+    // Enraged boss: brighter red tint and faster pulse
+    if (enemy.isEnraged && enemy.enemyType === 'boss') {
+      color = '#ff2200';
+    }
+
     // Phantom phase alpha
     let phantomAlpha = 1.0;
     if (enemy.enemyType === 'phantom') {
@@ -891,6 +896,15 @@ export class Renderer {
           ctx.arc(x, y, enemy.radius * 1.5, 0, Math.PI * 2);
           ctx.fill();
         }
+      }
+
+      // Enraged boss: pulsing red overlay
+      if (enemy.isEnraged) {
+        const enragePulse = Math.sin(gameTime * 8) * 0.2 + 0.3; // fast pulse between 0.1 and 0.5
+        ctx.fillStyle = `rgba(255, 34, 0, ${enragePulse})`;
+        ctx.beginPath();
+        ctx.arc(x, y, enemy.radius * 1.3, 0, Math.PI * 2);
+        ctx.fill();
       }
     } else {
       // Elite enemies get a gold glow overlay

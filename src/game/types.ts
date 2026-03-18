@@ -50,6 +50,7 @@ export interface Enemy extends Entity {
   bossTeleportTimer?: number;
   _spawnedEnemies?: Vector2[]; // temp buffer for harbinger-spawned enemies
   shieldAuraRadius?: number;
+  isEnraged?: boolean;
 }
 
 export interface Projectile extends Entity {

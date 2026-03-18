@@ -1349,13 +1349,65 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* ===================== Stats Bar ===================== */}
+      <section
+        style={{
+          position: "relative",
+          zIndex: 10,
+          padding: "40px 24px",
+          display: "flex",
+          justifyContent: "center",
+          gap: "clamp(16px, 4vw, 48px)",
+          flexWrap: "wrap",
+        }}
+      >
+        {[
+          { value: "11", label: "Abilities" },
+          { value: "6", label: "Evolutions" },
+          { value: "8", label: "Enemy Types" },
+          { value: "4", label: "Characters" },
+          { value: "40", label: "Achievements" },
+          { value: "7", label: "Synergies" },
+        ].map((stat) => (
+          <div
+            key={stat.label}
+            style={{
+              textAlign: "center",
+              minWidth: 80,
+            }}
+          >
+            <div
+              style={{
+                fontSize: "clamp(1.5rem, 3vw, 2.2rem)",
+                fontWeight: 900,
+                color: "#00f0ff",
+                lineHeight: 1,
+              }}
+            >
+              {stat.value}
+            </div>
+            <div
+              style={{
+                fontSize: "0.75rem",
+                color: "rgba(224,224,240,0.4)",
+                letterSpacing: "0.08em",
+                marginTop: 4,
+                textTransform: "uppercase",
+              }}
+            >
+              {stat.label}
+            </div>
+          </div>
+        ))}
+      </section>
+
       {/* ===================== CTA ===================== */}
       <section
         style={{
           position: "relative",
           zIndex: 10,
           textAlign: "center",
-          padding: "80px 24px",
+          padding: "60px 24px 80px",
         }}
       >
         <h2
