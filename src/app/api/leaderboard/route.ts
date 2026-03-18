@@ -96,14 +96,47 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { name, score } = body;
+    const { name, score, wave, time, kills, level } = body;
 
-    // Validate
+    // Validate basic fields
     if (!name || typeof name !== 'string' || name.length < 1 || name.length > 20) {
       return NextResponse.json({ error: 'Name must be 1-20 characters' }, { status: 400 });
     }
     if (typeof score !== 'number' || score < 0 || score > 10_000_000) {
       return NextResponse.json({ error: 'Invalid score' }, { status: 400 });
+    }
+
+    // Anti-cheat validation — reject obviously fake scores
+    if (
+      typeof wave === 'number' &&
+      typeof time === 'number' &&
+      typeof kills === 'number' &&
+      typeof level === 'number'
+    ) {
+      // Level cap — 50 is practically unreachable
+      if (level > 50) {
+        console.warn(`[anti-cheat] Rejected score from "${name}": level ${level} exceeds cap (50)`);
+        return NextResponse.json({ error: 'Score rejected' }, { status: 400 });
+      }
+
+      // Wave/time consistency — each wave takes ~30s minimum, 15s is generous
+      if (time > 0 && wave > time / 15) {
+        console.warn(`[anti-cheat] Rejected score from "${name}": wave ${wave} too high for time ${time}s (max ${Math.floor(time / 15)})`);
+        return NextResponse.json({ error: 'Score rejected' }, { status: 400 });
+      }
+
+      // Kill count sanity — max ~20 kills per second is very generous
+      if (time > 0 && kills > time * 20) {
+        console.warn(`[anti-cheat] Rejected score from "${name}": ${kills} kills in ${time}s exceeds limit (${Math.floor(time * 20)})`);
+        return NextResponse.json({ error: 'Score rejected' }, { status: 400 });
+      }
+
+      // Score sanity check — score should be roughly proportional to gameplay stats
+      const maxPlausibleScore = wave * 500 + kills * 10 + time * 50;
+      if (score > maxPlausibleScore) {
+        console.warn(`[anti-cheat] Rejected score from "${name}": score ${score} exceeds plausible max ${maxPlausibleScore} (wave=${wave}, kills=${kills}, time=${time})`);
+        return NextResponse.json({ error: 'Score rejected' }, { status: 400 });
+      }
     }
 
     // Sanitize name

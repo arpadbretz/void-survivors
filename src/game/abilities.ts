@@ -1040,6 +1040,18 @@ export const SYNERGY_DEFINITIONS: Synergy[] = [
     icon: '🔥',
     color: '#ff4466',
   },
+  {
+    id: 'temporal_surge',
+    name: 'Temporal Surge',
+    description: 'Time bends around you',
+    requiredAbilities: ['frost_aura', 'speed_boost'],
+    bonuses: [
+      { type: 'speed_mult', value: 1.15 },
+      { type: 'cooldown_mult', value: 0.9 },
+    ],
+    icon: '⏳',
+    color: '#00ffaa',
+  },
 ];
 
 /**

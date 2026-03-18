@@ -77,6 +77,7 @@ interface EngineCallbacks {
     dashCooldown: number;
     enemiesKilled: number;
     dps: number;
+    streak: number;
   }) => void;
   onLevelUp: (
     choices: {
@@ -246,6 +247,10 @@ export class GameEngine {
   // Trail color override from achievement rewards
   private trailColor: string | null = null;
   private prismaticHue: number = 0;
+
+  // Run streak tracking
+  private streakCount: number = 1;
+  private streakXpMultiplier: number = 1;
 
   // Bound event handlers for cleanup
   private boundKeyDown: ((e: KeyboardEvent) => void) | null = null;
@@ -459,6 +464,39 @@ export class GameEngine {
   // ── State Initialization ──────────────────────────────────────
 
   private initState(): void {
+    // Read and update run streak from localStorage
+    try {
+      const raw = localStorage.getItem('void-survivors-streak');
+      const today = new Date().toISOString().slice(0, 10);
+      if (raw) {
+        const data = JSON.parse(raw) as { count: number; lastPlayedDate: string };
+        const last = data.lastPlayedDate;
+        if (last === today) {
+          // Same day — increment
+          this.streakCount = data.count + 1;
+        } else {
+          // Check if yesterday
+          const lastDate = new Date(last + 'T00:00:00');
+          const todayDate = new Date(today + 'T00:00:00');
+          const diffMs = todayDate.getTime() - lastDate.getTime();
+          const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+          if (diffDays === 1) {
+            // Yesterday — keep streak and increment
+            this.streakCount = data.count + 1;
+          } else {
+            // Older — reset
+            this.streakCount = 1;
+          }
+        }
+      } else {
+        this.streakCount = 1;
+      }
+    } catch {
+      this.streakCount = 1;
+    }
+    // Cap streak XP bonus at 50% (10 days)
+    this.streakXpMultiplier = 1 + Math.min((this.streakCount - 1) * 0.05, 0.5);
+
     const center = WORLD_SIZE / 2;
     const charDef = this.characterDef;
 
@@ -517,6 +555,7 @@ export class GameEngine {
       hazards: [],
       lootDrops: [],
       activeSynergies: [],
+      streak: this.streakCount,
     };
 
     // Apply meta-progression bonuses
@@ -972,7 +1011,7 @@ export class GameEngine {
     // Passive XP trickle: earn small XP just for surviving (scales with wave)
     const xpPerSecond = 0.5 + this.state.wave * 0.3;
     const dailyXpMult = getModifierValue(this.dailyModifiers, 'xp_mult');
-    const trickleXp = xpPerSecond * dt * this.metaBonuses.xpMultiplier * this.characterDef.xpMultiplier * dailyXpMult * this.difficultyConfig.xpMult;
+    const trickleXp = xpPerSecond * dt * this.metaBonuses.xpMultiplier * this.characterDef.xpMultiplier * dailyXpMult * this.difficultyConfig.xpMult * this.streakXpMultiplier;
     p.xp += trickleXp;
     this.xpCollected += trickleXp;
   }
@@ -1047,7 +1086,7 @@ export class GameEngine {
         orb.active = false;
         const dailyXpMult = getModifierValue(this.dailyModifiers, 'xp_mult');
         const xpSynergyBonuses = computeSynergyBonuses(this.state.activeSynergies);
-        const xpGain = Math.floor(orb.value * this.metaBonuses.xpMultiplier * this.characterDef.xpMultiplier * dailyXpMult * this.difficultyConfig.xpMult * xpSynergyBonuses.xpMult);
+        const xpGain = Math.floor(orb.value * this.metaBonuses.xpMultiplier * this.characterDef.xpMultiplier * dailyXpMult * this.difficultyConfig.xpMult * xpSynergyBonuses.xpMult * this.streakXpMultiplier);
         p.xp += xpGain;
         this.xpCollected += xpGain;
         this.state.score += Math.floor(orb.value * this.difficultyConfig.scoreMult);
@@ -1758,7 +1797,7 @@ export class GameEngine {
       this.state.wave = expectedWave;
 
       // Wave survival bonus XP
-      const waveBonus = 10 + (expectedWave - 1) * 5;
+      const waveBonus = Math.floor((10 + (expectedWave - 1) * 5) * this.streakXpMultiplier);
       this.state.player.xp += waveBonus;
       this.xpCollected += waveBonus;
       this.state.score += waveBonus * 2;
@@ -1951,6 +1990,7 @@ export class GameEngine {
       dashCooldown: Math.max(0, this.dashCooldown),
       enemiesKilled: this.enemiesKilled,
       dps: this.dpsDisplay,
+      streak: this.streakCount,
     });
   }
 
@@ -1960,6 +2000,15 @@ export class GameEngine {
     this.state.gameOver = true;
     this.audio.stopMusic();
     this.audio.playGameOver();
+
+    // Save updated streak to localStorage
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      localStorage.setItem('void-survivors-streak', JSON.stringify({
+        count: this.streakCount,
+        lastPlayedDate: today,
+      }));
+    } catch { /* localStorage unavailable */ }
 
     // Mark first run complete so onboarding hints don't repeat
     if (this.isFirstRun) {

@@ -22,6 +22,7 @@ interface HUDState {
   dashCooldown: number;
   enemiesKilled: number;
   dps: number;
+  streak: number;
 }
 
 interface GameOverStats {
@@ -327,6 +328,7 @@ export default function PlayPage() {
     dashCooldown: 0,
     enemiesKilled: 0,
     dps: 0,
+    streak: 1,
   });
   const [upgradeChoices, setUpgradeChoices] = useState<UpgradeChoice[]>([]);
   const [rerollsUsed, setRerollsUsed] = useState(0);
@@ -440,6 +442,22 @@ export default function PlayPage() {
     try {
       const savedChar = localStorage.getItem("void-survivors-character");
       if (savedChar) setSelectedCharacter(savedChar);
+    } catch { /* ignore */ }
+
+    // Load run streak for menu display
+    try {
+      const rawStreak = localStorage.getItem("void-survivors-streak");
+      if (rawStreak) {
+        const streakData = JSON.parse(rawStreak) as { count: number; lastPlayedDate: string };
+        const today = new Date().toISOString().slice(0, 10);
+        const last = streakData.lastPlayedDate;
+        const lastDate = new Date(last + "T00:00:00");
+        const todayDate = new Date(today + "T00:00:00");
+        const diffDays = Math.round((todayDate.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
+        if (diffDays <= 1) {
+          setHud(prev => ({ ...prev, streak: streakData.count }));
+        }
+      }
     } catch { /* ignore */ }
 
     // Load daily challenge
@@ -723,7 +741,14 @@ export default function PlayPage() {
         const res = await fetch("/api/leaderboard", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: playerName, score: stats.score }),
+          body: JSON.stringify({
+            name: playerName,
+            score: stats.score,
+            wave: stats.wavesSurvived,
+            time: stats.timeSurvived,
+            kills: stats.enemiesKilled,
+            level: stats.level,
+          }),
         });
         if (res.ok) {
           const data = await res.json();
@@ -953,16 +978,23 @@ export default function PlayPage() {
     localStorage.setItem("void-survivors-player-name", cleanName);
     setPlayerName(cleanName);
     try {
+      const postBody: Record<string, unknown> = { name: cleanName, score };
+      if (gameOverStats) {
+        postBody.wave = gameOverStats.wavesSurvived;
+        postBody.time = gameOverStats.timeSurvived;
+        postBody.kills = gameOverStats.enemiesKilled;
+        postBody.level = gameOverStats.level;
+      }
       await fetch("/api/leaderboard", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: cleanName, score }),
+        body: JSON.stringify(postBody),
       });
       fetchLeaderboard(leaderboardTab);
     } catch {
       // Silently fail — score is still saved locally
     }
-  }, [fetchLeaderboard, leaderboardTab]);
+  }, [fetchLeaderboard, leaderboardTab, gameOverStats]);
 
   // -----------------------------------------------------------------------
   // Share score
@@ -1269,13 +1301,26 @@ export default function PlayPage() {
               </div>
             )}
 
-            <button
-              onClick={startGame}
-              className="btn-neon-filled animate-pulse-glow"
-              style={{ marginTop: 20, fontSize: "1.4rem", padding: "18px 64px" }}
-            >
-              PLAY
-            </button>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, marginTop: 20 }}>
+              <button
+                onClick={startGame}
+                className="btn-neon-filled animate-pulse-glow"
+                style={{ fontSize: "1.4rem", padding: "18px 64px" }}
+              >
+                PLAY
+              </button>
+              {hud.streak > 1 && (
+                <div style={{
+                  fontSize: "0.72rem",
+                  color: "#ff8800",
+                  fontFamily: "var(--font-geist-mono), monospace",
+                  letterSpacing: "0.05em",
+                  opacity: 0.85,
+                }}>
+                  {"\u{1F525}"} {hud.streak}-day streak &middot; +{Math.min((hud.streak - 1) * 5, 50)}% XP
+                </div>
+              )}
+            </div>
 
             {/* Daily Challenge Button */}
             {dailyChallenge && (
@@ -4544,6 +4589,26 @@ export default function PlayPage() {
               GAME OVER
             </h2>
 
+            {/* Streak Badge */}
+            {hud.streak > 1 && (
+              <div style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "4px 14px",
+                borderRadius: 8,
+                border: "1px solid rgba(255,136,0,0.4)",
+                background: "rgba(255,136,0,0.1)",
+                color: "#ff8800",
+                fontSize: "0.82rem",
+                fontWeight: 700,
+                fontFamily: "var(--font-geist-mono), monospace",
+                letterSpacing: "0.05em",
+              }}>
+                {"\u{1F525}"} {hud.streak}-day streak! +{Math.min((hud.streak - 1) * 5, 50)}% XP
+              </div>
+            )}
+
             {/* Character + Difficulty Badge */}
             <div style={{
               display: "flex",
@@ -5194,7 +5259,14 @@ export default function PlayPage() {
                     fetch("/api/leaderboard", {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ name, score: gameOverStats.score }),
+                      body: JSON.stringify({
+                        name,
+                        score: gameOverStats.score,
+                        wave: gameOverStats.wavesSurvived,
+                        time: gameOverStats.timeSurvived,
+                        kills: gameOverStats.enemiesKilled,
+                        level: gameOverStats.level,
+                      }),
                     })
                       .then((res) => res.ok ? res.json() : null)
                       .then((data) => {

@@ -190,6 +190,7 @@ export interface GameState {
   comboTimer?: number;
   comboMultiplier?: number;
   activeSynergies: ActiveSynergy[];
+  streak?: number;
 }
 
 export interface LootDrop {

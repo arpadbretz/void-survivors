@@ -2223,6 +2223,14 @@ export class Renderer {
       50
     );
 
+    // Streak indicator (below time, top-left)
+    if (state.streak && state.streak > 1) {
+      ctx.fillStyle = '#ff8800';
+      ctx.font = 'bold 12px monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText(`\u{1F525} ${state.streak}`, 20, 68);
+    }
+
     // Ability icons at the bottom
     this.drawAbilityIcons(player.abilities, state.time);
 
