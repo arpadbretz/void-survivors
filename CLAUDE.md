@@ -28,7 +28,7 @@
 - `achievements.ts` — 40 achievements, 4 tiers (bronze/silver/gold/platinum), 6 with trail color rewards
 - `stats.ts` — Persistent lifetime stats
 - `meta.ts` — Meta-progression currency and upgrades
-- `characters.ts` — 4 playable characters with unique stats (Void Walker, Phantom, Sentinel, Arcanist)
+- `characters.ts` — 5 playable characters with unique stats (Void Walker, Phantom, Sentinel, Arcanist, Chronomancer)
 - `daily.ts` — Daily challenge system with modifiers
 - `settings.ts` — Game settings persistence
 - `difficulty.ts` — 4 difficulty modes (Easy/Normal/Hard/Nightmare) with multipliers
@@ -76,6 +76,10 @@
 - Wave announcement shows enemy type preview
 - Boss enrage timer: bosses enrage after 45s alive (+50% speed, +30% damage, red pulsing overlay)
 - Arcanist `cooldownReduction: 0.85` — 15% faster ability cooldowns, applied multiplicatively with synergies
+- Chronomancer: time dilation aura slows enemies within 200px by 25%, starts with frost_aura
+- Mini-map: 120x120 corner HUD showing enemies (red), bosses (yellow), loot (green), hazards (purple)
+- Elite enemy modifiers: swift (+80% speed), regenerating (3 HP/s), splitting (spawns 2 copies), vampiric (heals on hit), armored (40% damage reduction)
+- Regular enemy loot drops: 2% for normal enemies, 10% for elites, 100% for bosses
 
 ## Performance Rules
 - Never use `shadowBlur` in the render loop
