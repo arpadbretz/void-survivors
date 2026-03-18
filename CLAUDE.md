@@ -20,7 +20,7 @@
 - `engine.ts` — Main game loop, physics, collisions, state management
 - `renderer.ts` — Canvas 2D rendering, HUD, visual effects (neon aesthetic)
 - `enemies.ts` — Enemy spawning, AI, wave configs (8 types: chaser, shooter, swarm, tank, splitter, boss, phantom, shielder)
-- `abilities.ts` — 11 player abilities, 6 evolutions, 7 synergies
+- `abilities.ts` — 12 player abilities, 7 evolutions, 7 synergies
 - `audio.ts` — Procedural SFX and music via Web Audio API (singleton AudioManager)
 - `particles.ts` — Object-pooled particle system
 - `types.ts` — All TypeScript interfaces (Entity, Player, Enemy, Projectile, Particle, XPOrb, Ability, GameState, etc.)
@@ -67,8 +67,8 @@
 - Kill streak announcements: Killing Spree (10), Rampage (25), Unstoppable (50), Godlike (100)
 - Critical damage numbers (>50 dmg) with pop animation
 - Player name prompt on first game over for leaderboard
-- 11 abilities: radial_shot, auto_cannon, orbit_shield, chain_lightning, frost_aura, missile_swarm, life_drain, xp_magnet, speed_boost, gravity_well, plasma_wave
-- 6 evolutions: Nova Burst, Railgun, Thunder Storm, Void Artillery, Singularity, Supernova
+- 12 abilities: radial_shot, auto_cannon, orbit_shield, chain_lightning, frost_aura, missile_swarm, life_drain, xp_magnet, speed_boost, gravity_well, plasma_wave, void_beam
+- 7 evolutions: Nova Burst, Railgun, Thunder Storm, Void Artillery, Singularity, Supernova, Annihilation Ray
 - Shielder enemy: protective aura reduces nearby enemy damage by 50%
 - Achievement rewards: 6 unlockable trail colors (Crimson, Golden, Violet, Inferno, Prismatic, Void)
 - Passive XP trickle scales with wave, wave completion bonus XP

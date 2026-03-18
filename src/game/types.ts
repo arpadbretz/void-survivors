@@ -30,7 +30,7 @@ export interface Player extends Entity {
   lastDamageTime: number;
 }
 
-export type EnemyType = 'chaser' | 'shooter' | 'swarm' | 'tank' | 'splitter' | 'boss' | 'phantom' | 'shielder';
+export type EnemyType = 'chaser' | 'shooter' | 'swarm' | 'tank' | 'splitter' | 'boss' | 'miniboss' | 'phantom' | 'shielder';
 
 export type EliteModifier = 'swift' | 'regenerating' | 'splitting' | 'vampiric' | 'armored';
 
@@ -65,6 +65,8 @@ export interface Projectile extends Entity {
   aoe?: { radius: number; damageFraction: number };
   isGravityWell?: boolean;
   isChainLightning?: boolean;
+  isVoidBeam?: boolean;
+  beamOrigin?: Vector2;        // start point for beam rendering
   chainTargets?: Vector2[];   // chain path for lightning bolt rendering
   spawnTime?: number;          // gameTime when created (for animation timing)
 }

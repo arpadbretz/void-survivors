@@ -28,6 +28,7 @@ import {
   EnemyManager,
   updateEnemies,
   shouldSpawnBoss,
+  shouldSpawnMiniBoss,
   createSplitEnemies,
   createEliteSplitCopies,
   createEnemy,
@@ -321,6 +322,36 @@ export class GameEngine {
 
     this.state.showUpgradeScreen = false;
     this.state.upgradeChoices = [];
+  }
+
+  rerollUpgradeChoices(): void {
+    if (!this.state || !this.state.showUpgradeScreen) return;
+    const choices = getRandomUpgradeChoices(this.state.player, 3);
+    this.state.upgradeChoices = choices;
+
+    // Notify React UI with new choices
+    if (this.callbacks) {
+      const currentAbilityIds = this.state.player.abilities.map(a => a.id);
+      this.callbacks.onLevelUp(
+        choices.map((c) => {
+          const completions = getSynergyCompletions(currentAbilityIds, c.id);
+          return {
+            id: c.id,
+            name: c.name,
+            description: getAbilityDescription(c, c.level),
+            icon: c.icon,
+            level: c.level,
+            maxLevel: c.maxLevel,
+            color: c.color,
+            synergy: completions.length > 0 ? {
+              name: completions[0].name,
+              icon: completions[0].icon,
+              color: completions[0].color,
+            } : undefined,
+          };
+        })
+      );
+    }
   }
 
   restart(): void {
@@ -1229,8 +1260,8 @@ export class GameEngine {
     this.enemiesKilled++;
     this.renderer?.flashKillCount(1);
 
-    // Track elite kills (boss, tank, splitter are elite-tier enemies)
-    if (enemy.enemyType === 'boss' || enemy.enemyType === 'tank' || enemy.enemyType === 'splitter') {
+    // Track elite kills (boss, miniboss, tank, splitter are elite-tier enemies)
+    if (enemy.enemyType === 'boss' || enemy.enemyType === 'miniboss' || enemy.enemyType === 'tank' || enemy.enemyType === 'splitter') {
       this.elitesKilled++;
     }
 
@@ -1318,6 +1349,12 @@ export class GameEngine {
 
       // Drop random loot (boss: 100%)
       this.spawnLootDrop(enemy.pos.x, enemy.pos.y);
+    } else if (enemy.enemyType === 'miniboss') {
+      // Mini-boss kill: always drop loot, bonus score, explosion burst
+      this.spawnLootDrop(enemy.pos.x, enemy.pos.y);
+      this.state.score += 100 + this.state.wave * 20;
+      this.particles.emitExplosion(enemy.pos.x, enemy.pos.y, '#ff8800', 25);
+      this.state.screenShake = 10;
     } else if (enemy.enemyType === 'tank' || enemy.enemyType === 'splitter') {
       // Elite enemies: 10% chance to drop loot
       if (Math.random() < 0.10) {
@@ -1650,6 +1687,19 @@ export class GameEngine {
         this.state.enemies.push(...tanks);
       } else if (eventName === 'SPEED FRENZY') {
         this.enemyManager.setWaveSpeedMultiplier(1.5);
+      }
+
+      // Mini-boss spawn on milestone waves (between boss waves)
+      if (shouldSpawnMiniBoss(expectedWave)) {
+        const miniBossEnemies = this.enemyManager.spawnWave(
+          expectedWave,
+          this.state.player.pos,
+          WORLD_SIZE,
+          this.state.enemies
+        );
+        for (const e of miniBossEnemies) e.spawnTime = this.state.time;
+        this.state.enemies.push(...miniBossEnemies);
+        this.renderer?.announceStreak('MINI-BOSS!', '#ff8800');
       }
 
       // Tutorial: combo hint when wave 2 starts

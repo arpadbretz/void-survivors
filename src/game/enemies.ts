@@ -69,6 +69,12 @@ export function shouldSpawnBoss(wave: number): boolean {
   return wave % 5 === 0;
 }
 
+const MINI_BOSS_WAVES = new Set([3, 6, 8, 11, 13, 16, 18]);
+
+export function shouldSpawnMiniBoss(wave: number): boolean {
+  return MINI_BOSS_WAVES.has(wave);
+}
+
 // ── Boss Variant Selection ──────────────────────────────────────
 
 function getBossVariant(wave: number): 'titan' | 'harbinger' | 'nexus' {
@@ -215,6 +221,25 @@ export function createEnemy(
         enemyType: 'shielder',
         shieldAuraRadius: 120,
       };
+
+    case 'miniboss': {
+      const mbHp = 200 + (wave - 1) * 50;
+      const enemy: Enemy = {
+        ...base,
+        radius: 20,
+        health: Math.round(mbHp * hpMult),
+        maxHealth: Math.round(mbHp * hpMult),
+        speed: Math.round(100 * spdMult),
+        damage: Math.round(8 * scaleDmg),
+        xpValue: 50,
+        color: '#ff8800',
+        glowColor: '#cc6600',
+        enemyType: 'miniboss',
+      };
+      // Mini-bosses are always elite
+      makeElite(enemy);
+      return enemy;
+    }
 
     case 'boss': {
       const variant = getBossVariant(wave);
@@ -384,6 +409,14 @@ export class EnemyManager {
         spawnPos.y = Math.max(50, Math.min(worldSize - 50, spawnPos.y));
         newEnemies.push(createEnemy('boss', spawnPos, wave, this.difficultyConfig));
       }
+    }
+
+    // Mini-boss on milestone waves (between boss waves)
+    if (shouldSpawnMiniBoss(wave)) {
+      const spawnPos = add(playerPos, randomOnCircle(600));
+      spawnPos.x = Math.max(50, Math.min(worldSize - 50, spawnPos.x));
+      spawnPos.y = Math.max(50, Math.min(worldSize - 50, spawnPos.y));
+      newEnemies.push(createEnemy('miniboss', spawnPos, wave, this.difficultyConfig));
     }
 
     return newEnemies;
@@ -621,6 +654,12 @@ export function updateEnemies(
         }
         break;
       }
+
+      case 'miniboss':
+        // Mini-boss: aggressive chase toward player
+        enemy.vel.x = dir.x * enemy.speed;
+        enemy.vel.y = dir.y * enemy.speed;
+        break;
 
       case 'boss': {
         const variant = enemy.bossVariant ?? 'titan';

@@ -704,6 +704,67 @@ function plasmaWave(): Ability {
   };
 }
 
+function voidBeam(): Ability {
+  return {
+    id: 'void_beam',
+    name: 'Void Beam',
+    description: 'Channeled laser that pierces all enemies in a line.',
+    icon: '🔦',
+    level: 1,
+    maxLevel: 8,
+    color: '#ff00ff',
+    cooldown: 0.3,
+    lastUsed: -999,
+    onUpdate(player, enemies, _proj, particles, dt, gameTime) {
+      // Evolved: Annihilation Ray
+      const evolved = this.evolved;
+      const cd = evolved
+        ? Math.max(0.1, 0.2 - this.level * 0.01)
+        : Math.max(0.15, 0.3 - this.level * 0.02);
+      if (gameTime - this.lastUsed < cd) return [];
+      this.lastUsed = gameTime;
+
+      const damage = evolved ? (3 + this.level * 2) * 3 : 3 + this.level * 2;
+      const range = evolved
+        ? (300 + this.level * 30) * 2
+        : 300 + this.level * 30;
+      const hitboxWidth = evolved ? 24 : 12;
+
+      // Find nearest enemy within range
+      let nearest: Enemy | null = null;
+      let nearDist = range;
+      for (const enemy of enemies) {
+        if (!enemy.active) continue;
+        const dx = enemy.pos.x - player.pos.x;
+        const dy = enemy.pos.y - player.pos.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < nearDist) {
+          nearDist = dist;
+          nearest = enemy;
+        }
+      }
+
+      if (!nearest) return [];
+
+      const a = Math.atan2(nearest.pos.y - player.pos.y, nearest.pos.x - player.pos.x);
+
+      // Create a beam projectile — very fast, very short lifetime, high piercing
+      const beamSpeed = 3000;
+      const proj = createPlayerProjectile(
+        player.pos.x, player.pos.y,
+        a, beamSpeed, damage, 999, 0.1,
+        '#ff00ff', '#cc00cc',
+        evolved ? 12 : 6
+      );
+      proj.isVoidBeam = true;
+      proj.beamOrigin = { x: player.pos.x, y: player.pos.y };
+
+      particles.emit(player.pos.x, player.pos.y, 2, '#ff00ff', 20, 0.1);
+      return [proj];
+    },
+  };
+}
+
 // ── Registry ────────────────────────────────────────────────────
 
 type AbilityFactory = () => Ability;
@@ -720,6 +781,7 @@ const ABILITY_REGISTRY: AbilityFactory[] = [
   speedBoost,
   gravityWell,
   plasmaWave,
+  voidBeam,
 ];
 
 // ── Public API ──────────────────────────────────────────────────
@@ -734,6 +796,10 @@ export function createAutoCannonAbility(): Ability {
 
 export function createOrbitShieldAbility(): Ability {
   return orbitShield();
+}
+
+export function createVoidBeamAbility(): Ability {
+  return voidBeam();
 }
 
 export function createAbilityById(id: string): Ability | null {
@@ -801,6 +867,7 @@ const EVOLUTION_MAP: Record<string, { name: string; icon: string; color: string 
   missile_swarm: { name: 'Void Artillery', icon: '☄️', color: '#ff0044' },
   gravity_well: { name: 'Singularity', icon: '🕳️', color: '#440088' },
   plasma_wave: { name: 'Supernova', icon: '💥', color: '#ff88cc' },
+  void_beam: { name: 'Annihilation Ray', icon: '☄️', color: '#ff44ff' },
 };
 
 export function applyUpgradeChoice(player: Player, choice: Ability): void {
@@ -853,6 +920,8 @@ export function getAbilityDescription(ability: Ability, level: number): string {
         return `EVOLVED: Singularity — 2 vortexes simultaneously, double pull strength and damage. Dark energy field.`;
       case 'plasma_wave':
         return `EVOLVED: Supernova — Massive shockwave (2x radius), 3x damage. Obliterates everything nearby.`;
+      case 'void_beam':
+        return `EVOLVED: Annihilation Ray — 3x damage, 2x range, wider beam. Obliterates all in its path.`;
     }
   }
 
@@ -879,6 +948,8 @@ export function getAbilityDescription(ability: Ability, level: number): string {
       return `Creates a vortex pulling enemies in. ${(3 + (level - 1) * 0.5).toFixed(1)}s duration, ${80 + (level - 1) * 20}px radius, ${2 + (level - 1)} tick damage.`;
     case 'plasma_wave':
       return `Shockwave hits all enemies within ${120 + level * 25}px. ${15 + level * 8} damage, ${(Math.max(2.0, 4.0 - level * 0.4)).toFixed(1)}s cooldown.`;
+    case 'void_beam':
+      return `Piercing beam hits all enemies in a line. ${3 + level * 2} damage/tick, ${300 + level * 30}px range, ${(Math.max(0.15, 0.3 - level * 0.02)).toFixed(2)}s cooldown.`;
     default:
       return ability.description;
   }

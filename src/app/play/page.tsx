@@ -117,6 +117,7 @@ interface GameEngineInterface {
   resume: () => void;
   pause: () => void;
   selectUpgrade: (index: number) => void;
+  rerollUpgradeChoices: () => void;
   restart: () => void;
   setSoundEnabled: (enabled: boolean) => void;
   applyDisplaySettings: (settings: { showFps: boolean; showMinimap: boolean; screenShake: boolean; tutorialHints: boolean }) => void;
@@ -205,6 +206,7 @@ export default function PlayPage() {
     enemiesKilled: 0,
   });
   const [upgradeChoices, setUpgradeChoices] = useState<UpgradeChoice[]>([]);
+  const [rerollsUsed, setRerollsUsed] = useState(0);
   const [gameOverStats, setGameOverStats] = useState<GameOverStats | null>(
     null
   );
@@ -439,6 +441,7 @@ export default function PlayPage() {
 
   const handleLevelUp = useCallback((choices: UpgradeChoice[]) => {
     setUpgradeChoices(choices);
+    setRerollsUsed(0);
     setScreen("upgrade");
   }, []);
 
@@ -3222,6 +3225,42 @@ export default function PlayPage() {
               );
             })}
           </div>
+
+          {/* Reroll button — max 2 rerolls per level-up, costs increase */}
+          {rerollsUsed < 2 && (
+            <button
+              onClick={() => {
+                if (engineRef.current) {
+                  engineRef.current.rerollUpgradeChoices();
+                  setRerollsUsed(prev => prev + 1);
+                }
+              }}
+              style={{
+                marginTop: 20,
+                padding: "8px 24px",
+                background: "rgba(255, 170, 0, 0.12)",
+                border: "1px solid rgba(255, 170, 0, 0.4)",
+                borderRadius: 8,
+                color: "#ffaa00",
+                fontSize: "0.85rem",
+                fontWeight: 700,
+                fontFamily: "var(--font-geist-mono), monospace",
+                cursor: "pointer",
+                letterSpacing: "0.05em",
+                transition: "all 0.15s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "rgba(255, 170, 0, 0.25)";
+                e.currentTarget.style.borderColor = "rgba(255, 170, 0, 0.7)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "rgba(255, 170, 0, 0.12)";
+                e.currentTarget.style.borderColor = "rgba(255, 170, 0, 0.4)";
+              }}
+            >
+              {"\u{1F3B2}"} Reroll ({2 - rerollsUsed} left)
+            </button>
+          )}
         </div>
       )}
 

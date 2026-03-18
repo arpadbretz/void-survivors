@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 const SITE_URL = "https://void-survivors.vercel.app";
 const TITLE = "Void Survivors — A Neon Roguelike";
 const DESCRIPTION =
-  "Play Void Survivors free in your browser — a neon roguelike survivors game with 11 abilities, 6 evolutions, 7 synergies, 8 enemy types, 5 elite variants, 3 bosses, 5 characters, 40 achievements, mini-map, global leaderboard, daily challenges, and meta-progression. No download required.";
+  "Play Void Survivors free in your browser — a neon roguelike survivors game with 12 abilities, 7 evolutions, 7 synergies, 9 enemy types, 5 elite variants, 3 bosses, 5 characters, 40 achievements, mini-map, upgrade rerolls, global leaderboard, daily challenges, and meta-progression. No download required.";
 const OG_IMAGE = `${SITE_URL}/api/og`;
 
 export const metadata: Metadata = {

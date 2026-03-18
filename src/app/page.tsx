@@ -409,7 +409,7 @@ export default function HomePage() {
         >
           <FeatureCard
             icon={"⚡"}
-            title="11 Abilities + 6 Evolutions"
+            title="12 Abilities + 7 Evolutions"
             description="Chain Lightning, Plasma Wave, Orbit Shield, Gravity Well and more. Max out abilities to unlock devastating Evolutions. Combine abilities for 7 powerful Synergy bonuses."
           />
           <FeatureCard
@@ -1362,8 +1362,8 @@ export default function HomePage() {
         }}
       >
         {[
-          { value: "11", label: "Abilities" },
-          { value: "6", label: "Evolutions" },
+          { value: "12", label: "Abilities" },
+          { value: "7", label: "Evolutions" },
           { value: "8", label: "Enemy Types" },
           { value: "5", label: "Characters" },
           { value: "40", label: "Achievements" },

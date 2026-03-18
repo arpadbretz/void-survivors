@@ -766,6 +766,11 @@ export class Renderer {
         color = '#44aaff';
         rot = gameTime * 1.5;
         break;
+      case 'miniboss':
+        sides = 6; // hexagon
+        color = '#ff8800';
+        rot = gameTime * 1.2;
+        break;
       case 'boss': {
         const variant = enemy.bossVariant ?? 'titan';
         if (variant === 'titan') {
@@ -937,6 +942,23 @@ export class Renderer {
         ctx.arc(x, y, enemy.radius * 1.3, 0, Math.PI * 2);
         ctx.fill();
       }
+    } else if (enemy.enemyType === 'miniboss') {
+      // Mini-boss: larger hexagon with orange pulsing glow ring
+      this.drawGlow(ctx, x, y, enemy.radius * 2.5, '#ff8800', 0.2);
+      const pulse = 1 + Math.sin(gameTime * 3) * 0.08;
+      this.drawPolygonGlow(ctx, x, y, enemy.radius * pulse, 6, '#cc6600', 0.25, rot);
+      this.drawPolygon(ctx, x, y, enemy.radius * pulse, 6, color, rot);
+      // Inner core hexagon
+      this.drawPolygon(ctx, x, y, enemy.radius * 0.45, 6, '#ffcc66', -rot);
+      // Pulsing glow ring (orange, like boss red ring but orange)
+      const ringPulse = 0.15 + Math.sin(gameTime * 4) * 0.1;
+      ctx.strokeStyle = '#ff8800';
+      ctx.lineWidth = 2;
+      ctx.globalAlpha = ringPulse;
+      ctx.beginPath();
+      ctx.arc(x, y, enemy.radius * 1.6 + Math.sin(gameTime * 3) * 3, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
     } else {
       // Elite enemies get a gold glow overlay
       if (enemy.isElite) {
@@ -1118,6 +1140,12 @@ export class Renderer {
       return;
     }
 
+    // Special rendering for void beam
+    if (proj.isVoidBeam && proj.beamOrigin) {
+      this.drawVoidBeam(proj);
+      return;
+    }
+
     // Special rendering for gravity well
     if (proj.isGravityWell) {
       ctx.globalCompositeOperation = 'lighter';
@@ -1287,6 +1315,53 @@ export class Renderer {
       ctx.lineTo(points[i].x, points[i].y);
     }
     ctx.stroke();
+  }
+
+  // ── Void Beam Rendering ──────────────────────────────────────
+
+  private drawVoidBeam(proj: Projectile): void {
+    const ctx = this.ctx;
+    const origin = proj.beamOrigin!;
+    const end = proj.pos;
+
+    ctx.globalCompositeOperation = 'lighter';
+
+    // Outer glow line (wide, low alpha)
+    ctx.strokeStyle = '#ff00ff';
+    ctx.lineWidth = proj.radius * 3;
+    ctx.globalAlpha = 0.15;
+    ctx.beginPath();
+    ctx.moveTo(origin.x, origin.y);
+    ctx.lineTo(end.x, end.y);
+    ctx.stroke();
+
+    // Mid glow line
+    ctx.strokeStyle = '#ff44ff';
+    ctx.lineWidth = proj.radius * 1.5;
+    ctx.globalAlpha = 0.4;
+    ctx.beginPath();
+    ctx.moveTo(origin.x, origin.y);
+    ctx.lineTo(end.x, end.y);
+    ctx.stroke();
+
+    // Core beam (bright, thin)
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = proj.radius * 0.6;
+    ctx.globalAlpha = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(origin.x, origin.y);
+    ctx.lineTo(end.x, end.y);
+    ctx.stroke();
+
+    // Bright tip at the end
+    ctx.fillStyle = '#ff88ff';
+    ctx.globalAlpha = 0.6;
+    ctx.beginPath();
+    ctx.arc(end.x, end.y, proj.radius * 1.2, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
   }
 
   /**
@@ -2292,13 +2367,19 @@ export class Renderer {
       ctx.fillRect(mx + l.pos.x * scale - 1, my + l.pos.y * scale - 1, 2, 2);
     }
 
-    // Enemies — red dots (1.5px) and boss yellow dots (3px)
-    // Batch regular enemies first, then bosses
+    // Enemies — red dots (1.5px), miniboss yellow dots (2px), boss yellow dots (3px)
+    // Batch regular enemies first, then minibosses, then bosses
     ctx.fillStyle = '#ff3344';
     for (let i = 0; i < state.enemies.length; i++) {
       const e = state.enemies[i];
-      if (!e.active || e.enemyType === 'boss') continue;
+      if (!e.active || e.enemyType === 'boss' || e.enemyType === 'miniboss') continue;
       ctx.fillRect(mx + e.pos.x * scale - 0.75, my + e.pos.y * scale - 0.75, 1.5, 1.5);
+    }
+    ctx.fillStyle = '#ffdd00';
+    for (let i = 0; i < state.enemies.length; i++) {
+      const e = state.enemies[i];
+      if (!e.active || e.enemyType !== 'miniboss') continue;
+      ctx.fillRect(mx + e.pos.x * scale - 1, my + e.pos.y * scale - 1, 2, 2);
     }
     ctx.fillStyle = '#ffdd00';
     for (let i = 0; i < state.enemies.length; i++) {
