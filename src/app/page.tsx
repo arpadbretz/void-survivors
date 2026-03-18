@@ -414,7 +414,7 @@ export default function HomePage() {
           />
           <FeatureCard
             icon={"👾"}
-            title="8 Enemy Types + 3 Boss Variants"
+            title="9 Enemy Types + 3 Boss Variants"
             description="Face 8 enemy types with Elite variants, plus 3 unique bosses — the towering Titan, the projectile-spewing Harbinger, and the teleporting Nexus. Shielders protect their allies."
           />
           <FeatureCard
@@ -1364,7 +1364,7 @@ export default function HomePage() {
         {[
           { value: "12", label: "Abilities" },
           { value: "7", label: "Evolutions" },
-          { value: "8", label: "Enemy Types" },
+          { value: "9", label: "Enemy Types" },
           { value: "5", label: "Characters" },
           { value: "40", label: "Achievements" },
           { value: "7", label: "Synergies" },
