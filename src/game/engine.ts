@@ -821,6 +821,13 @@ export class GameEngine {
       const synBonuses = computeSynergyBonuses(this.state.activeSynergies);
       p.health = Math.min(p.maxHealth, p.health + (baseRegen + charRegen + synBonuses.healthRegen) * dt);
     }
+
+    // Passive XP trickle: earn small XP just for surviving (scales with wave)
+    const xpPerSecond = 0.5 + this.state.wave * 0.3;
+    const dailyXpMult = getModifierValue(this.dailyModifiers, 'xp_mult');
+    const trickleXp = xpPerSecond * dt * this.metaBonuses.xpMultiplier * this.characterDef.xpMultiplier * dailyXpMult * this.difficultyConfig.xpMult;
+    p.xp += trickleXp;
+    this.xpCollected += trickleXp;
   }
 
   private updateAbilities(dt: number): void {
@@ -1524,6 +1531,17 @@ export class GameEngine {
     const expectedWave = Math.floor(this.state.time / WAVE_DURATION) + 1;
     if (expectedWave > this.state.wave) {
       this.state.wave = expectedWave;
+
+      // Wave survival bonus XP
+      const waveBonus = 10 + (expectedWave - 1) * 5;
+      this.state.player.xp += waveBonus;
+      this.xpCollected += waveBonus;
+      this.state.score += waveBonus * 2;
+      this.particles.emit(
+        this.state.player.pos.x,
+        this.state.player.pos.y,
+        8, '#00ff88', 80, 0.4
+      );
 
       // Reset speed multiplier each wave
       this.enemyManager.setWaveSpeedMultiplier(1);

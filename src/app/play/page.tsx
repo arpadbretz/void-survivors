@@ -161,6 +161,26 @@ function formatTime(seconds: number): string {
 }
 
 // ---------------------------------------------------------------------------
+// Loading Tips — shown on game over screen
+// ---------------------------------------------------------------------------
+const LOADING_TIPS: string[] = [
+  "Shielders protect nearby enemies \u2014 take them out first!",
+  "Combine Chain Lightning + Frost Aura for the Elemental Storm synergy",
+  "Higher difficulty = higher score multiplier",
+  "The Arcanist deals 25% more damage but gains XP slower",
+  "Evolved abilities unlock at max level \u2014 keep upgrading!",
+  "Gravity Well + Chain Lightning activates the Death Zone synergy",
+  "Play the Daily Challenge for unique modifiers",
+  "Earn Void Essence to buy permanent upgrades in the Shop",
+  "Dash through enemies with SPACE to dodge attacks",
+  "Orbit Shield orbs deal contact damage to nearby enemies",
+  "Boss loot drops include Smart Bombs that clear the screen",
+  "Phantoms phase in and out \u2014 time your attacks",
+  "Life Drain heals you for each enemy hit \u2014 great for survival",
+  "Missile Swarm + Auto Cannon triggers the Bullet Hell synergy",
+];
+
+// ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 export default function PlayPage() {
@@ -188,6 +208,7 @@ export default function PlayPage() {
   const [gameOverStats, setGameOverStats] = useState<GameOverStats | null>(
     null
   );
+  const [gameOverTipIndex, setGameOverTipIndex] = useState(0);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const [highScores, setHighScores] = useState<HighScoreEntry[]>([]);
@@ -423,6 +444,7 @@ export default function PlayPage() {
 
   const handleGameOver = useCallback(async (stats: GameOverStats) => {
     setGameOverStats(stats);
+    setGameOverTipIndex(Math.floor(Math.random() * LOADING_TIPS.length));
 
     // Save daily challenge result if in daily mode
     if (isDailyMode && dailyChallenge) {
@@ -2082,18 +2104,55 @@ export default function PlayPage() {
                 const hours = Math.floor(s.totalPlaytime / 3600);
                 const mins = Math.floor((s.totalPlaytime % 3600) / 60);
                 const secs = Math.floor(s.totalPlaytime % 60);
-                const playtimeStr = `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+                const playtimeStr = hours > 0
+                  ? `${hours}h ${mins}m ${secs}s`
+                  : mins > 0
+                  ? `${mins}m ${secs}s`
+                  : `${secs}s`;
 
-                const stats = [
-                  { icon: "\u{1F3AE}", label: "Games Played", value: s.gamesPlayed.toLocaleString() },
-                  { icon: "\u{1F5E1}\u{FE0F}", label: "Total Kills", value: s.totalKills.toLocaleString() },
-                  { icon: "\u{23F1}\u{FE0F}", label: "Total Playtime", value: playtimeStr },
-                  { icon: "\u{2B50}", label: "Total Score", value: s.totalScore.toLocaleString() },
-                  { icon: "\u{1F3C6}", label: "Highest Score", value: s.highestScore.toLocaleString() },
-                  { icon: "\u{1F30A}", label: "Highest Wave", value: s.highestWave.toLocaleString() },
-                  { icon: "\u{1F4AA}", label: "Highest Level", value: s.highestLevel.toLocaleString() },
-                  { icon: "\u{26A1}", label: "Highest Combo", value: `${s.highestCombo.toLocaleString()}x` },
-                  { icon: "\u{1F479}", label: "Bosses Killed", value: s.bossesKilled.toLocaleString() },
+                // Determine favorite character from run history
+                let favoriteCharLabel = "N/A";
+                let favoriteCharColor = "#00eeff";
+                let favoriteCharIcon = "\u{1F4A0}";
+                try {
+                  const raw = localStorage.getItem("void-survivors-run-history");
+                  if (raw) {
+                    const runs = JSON.parse(raw);
+                    if (Array.isArray(runs) && runs.length > 0) {
+                      const counts: Record<string, number> = {};
+                      for (const run of runs) {
+                        if (run.character) counts[run.character] = (counts[run.character] || 0) + 1;
+                      }
+                      const topId = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0];
+                      if (topId) {
+                        const charDef = characterDefs.find(c => c.id === topId);
+                        if (charDef) {
+                          favoriteCharLabel = `${charDef.name} (${counts[topId]} runs)`;
+                          favoriteCharColor = charDef.color;
+                          favoriteCharIcon = charDef.icon;
+                        } else {
+                          favoriteCharLabel = `${topId} (${counts[topId]} runs)`;
+                        }
+                      }
+                    }
+                  }
+                } catch { /* ignore */ }
+
+                // Synergy tracking placeholder — not yet tracked in lifetime stats
+                const synergiesLabel = "Coming soon";
+
+                const stats: { icon: string; label: string; value: string; color: string }[] = [
+                  { icon: "\u{1F3AE}", label: "Games Played", value: s.gamesPlayed.toLocaleString(), color: "#00eeff" },
+                  { icon: "\u{1F5E1}\u{FE0F}", label: "Total Kills", value: s.totalKills.toLocaleString(), color: "#ff00aa" },
+                  { icon: "\u{23F1}\u{FE0F}", label: "Total Playtime", value: playtimeStr, color: "#00ff88" },
+                  { icon: "\u{2B50}", label: "Total Score", value: s.totalScore.toLocaleString(), color: "#ffd700" },
+                  { icon: "\u{1F3C6}", label: "Highest Score", value: s.highestScore.toLocaleString(), color: "#ffd700" },
+                  { icon: "\u{1F30A}", label: "Highest Wave", value: s.highestWave.toLocaleString(), color: "#00f0ff" },
+                  { icon: "\u{1F4AA}", label: "Highest Level", value: s.highestLevel.toLocaleString(), color: "#00ff88" },
+                  { icon: "\u{26A1}", label: "Highest Combo", value: `${s.highestCombo.toLocaleString()}x`, color: "#ff8800" },
+                  { icon: "\u{1F479}", label: "Bosses Killed", value: s.bossesKilled.toLocaleString(), color: "#ff2244" },
+                  { icon: favoriteCharIcon, label: "Favorite Character", value: favoriteCharLabel, color: favoriteCharColor },
+                  { icon: "\u{1F300}", label: "Total Synergies", value: synergiesLabel, color: "#aa66ff" },
                 ];
 
                 return stats.map((stat) => (
@@ -2105,7 +2164,7 @@ export default function PlayPage() {
                       justifyContent: "space-between",
                       padding: "12px 16px",
                       background: "rgba(255,255,255,0.03)",
-                      border: "1px solid rgba(0,238,255,0.1)",
+                      border: `1px solid ${stat.color}18`,
                       borderRadius: 8,
                     }}
                   >
@@ -2117,11 +2176,11 @@ export default function PlayPage() {
                     </div>
                     <span
                       style={{
-                        color: "#00eeff",
+                        color: stat.color,
                         fontSize: "1rem",
                         fontWeight: 700,
                         letterSpacing: "0.05em",
-                        textShadow: "0 0 6px rgba(0,238,255,0.3)",
+                        textShadow: `0 0 6px ${stat.color}4d`,
                       }}
                     >
                       {stat.value}
@@ -4514,6 +4573,38 @@ export default function PlayPage() {
               <button className="btn-neon" onClick={backToMenu}>
                 MENU
               </button>
+            </div>
+
+            {/* Loading Tip */}
+            <div style={{
+              marginTop: 16,
+              padding: "12px 20px",
+              borderRadius: 12,
+              border: "1px solid rgba(0,240,255,0.18)",
+              background: "linear-gradient(135deg, rgba(0,240,255,0.06), rgba(170,102,255,0.04))",
+              maxWidth: 380,
+              width: "100%",
+              textAlign: "center",
+            }}>
+              <div style={{
+                fontSize: "0.6rem",
+                fontWeight: 700,
+                letterSpacing: "0.2em",
+                color: "rgba(0,240,255,0.5)",
+                textTransform: "uppercase",
+                marginBottom: 6,
+              }}>
+                TIP
+              </div>
+              <div style={{
+                fontSize: isMobile ? "0.76rem" : "0.82rem",
+                color: "rgba(224,224,240,0.7)",
+                fontFamily: mono,
+                lineHeight: 1.5,
+                letterSpacing: "0.02em",
+              }}>
+                {LOADING_TIPS[gameOverTipIndex]}
+              </div>
             </div>
           </div>
         </div>
