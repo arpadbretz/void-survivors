@@ -213,6 +213,10 @@ export class GameEngine {
   // Tutorial triggers
   private tutorialTriggered: Set<string> = new Set();
 
+  // First-run onboarding
+  private isFirstRun: boolean = false;
+  private movementTime: number = 0;
+
   // Character selection
   private characterId: string = 'void_walker';
   private characterDef: CharacterDef = getCharacter('void_walker');
@@ -255,6 +259,13 @@ export class GameEngine {
     this.enemyManager = new EnemyManager();
     this.audio = AudioManager.getInstance();
 
+    // Detect first-run from localStorage
+    try {
+      this.isFirstRun = !localStorage.getItem('void-survivors-first-run');
+    } catch {
+      this.isFirstRun = true;
+    }
+
     this.input = {
       up: false,
       down: false,
@@ -283,10 +294,12 @@ export class GameEngine {
     this.attachListeners();
     this.running = true;
 
-    // Tutorial: movement hint
-    setTimeout(() => {
-      this.renderer?.showTutorialHint('move', 'Use WASD or Arrow Keys to move');
-    }, 1000);
+    // Tutorial: movement hint (first run only — with pulsing indicator)
+    if (this.isFirstRun) {
+      setTimeout(() => {
+        this.renderer?.showTutorialHint('move', '\u{1F3AE}  WASD to move', 5);
+      }, 500);
+    }
     this.lastTimestamp = performance.now();
     this.animationFrameId = requestAnimationFrame(this.gameLoop);
   }
@@ -529,6 +542,7 @@ export class GameEngine {
     this.dashDirection = { x: 0, y: 0 };
     this.enemyManager.reset();
     this.tutorialTriggered = new Set();
+    this.movementTime = 0;
     this.lastVoidRiftSpawn = 0;
     this.lastGravityAnomalySpawn = 0;
     this.hazardIdCounter = 0;
@@ -909,6 +923,15 @@ export class GameEngine {
 
     if (dx !== 0 || dy !== 0) {
       this.particles.emitTrail(p.pos.x, p.pos.y, this.resolveTrailColor('#00aacc'));
+
+      // First-run onboarding: track movement time for auto-ability hint
+      if (this.isFirstRun && !this.tutorialTriggered.has('autofire')) {
+        this.movementTime += dt;
+        if (this.movementTime >= 3) {
+          this.tutorialTriggered.add('autofire');
+          this.renderer?.showTutorialHint('autofire', '\u26A1  Abilities fire automatically \u2014 focus on dodging!', 5);
+        }
+      }
     }
 
     // Passive health regeneration: 1 HP per 3 seconds + character bonus + synergy regen
@@ -1247,8 +1270,11 @@ export class GameEngine {
     this.audio.playDamage();
     this.renderer?.triggerDamageFlash();
 
-    // Tutorial: dash hint on first damage
-    if (!this.tutorialTriggered.has('dash')) {
+    // Tutorial: dash hint on first damage (or health below 50% for first-run)
+    if (this.isFirstRun && !this.tutorialTriggered.has('dash') && p.health < p.maxHealth * 0.5) {
+      this.tutorialTriggered.add('dash');
+      this.renderer?.showTutorialHint('dash', '\u{1F6E1}\uFE0F  Watch your health! Dash with SPACE to dodge.', 5);
+    } else if (!this.isFirstRun && !this.tutorialTriggered.has('dash')) {
       this.tutorialTriggered.add('dash');
       this.renderer?.showTutorialHint('dash', 'Press SPACE while moving to dash!', 5);
     }
@@ -1284,6 +1310,12 @@ export class GameEngine {
 
     this.enemiesKilled++;
     this.renderer?.flashKillCount(1);
+
+    // First-run onboarding: XP orb hint on first kill
+    if (this.isFirstRun && !this.tutorialTriggered.has('xporb')) {
+      this.tutorialTriggered.add('xporb');
+      this.renderer?.showTutorialHint('xporb', '\u2728  Enemies drop XP orbs \u2014 collect them to level up!', 5);
+    }
 
     // Track elite kills (boss, miniboss, tank, splitter are elite-tier enemies)
     if (enemy.enemyType === 'boss' || enemy.enemyType === 'miniboss' || enemy.enemyType === 'tank' || enemy.enemyType === 'splitter') {
@@ -1590,7 +1622,11 @@ export class GameEngine {
       // Tutorial: upgrade hint
       if (!this.tutorialTriggered.has('upgrade')) {
         this.tutorialTriggered.add('upgrade');
-        this.renderer?.showTutorialHint('upgrade', 'Press 1, 2, or 3 to choose an upgrade');
+        if (this.isFirstRun) {
+          this.renderer?.showTutorialHint('upgrade', '\u{1F31F}  Choose an upgrade! Each ability has unique strengths.', 5);
+        } else {
+          this.renderer?.showTutorialHint('upgrade', 'Press 1, 2, or 3 to choose an upgrade');
+        }
       }
 
       // Notify React UI
@@ -1727,10 +1763,14 @@ export class GameEngine {
         this.renderer?.announceStreak('MINI-BOSS!', '#ff8800');
       }
 
-      // Tutorial: combo hint when wave 2 starts
+      // Tutorial: wave 2 hint
       if (expectedWave === 2 && !this.tutorialTriggered.has('combo')) {
         this.tutorialTriggered.add('combo');
-        this.renderer?.showTutorialHint('combo', 'Kill enemies quickly to build combos for bonus score!', 5);
+        if (this.isFirstRun) {
+          this.renderer?.showTutorialHint('combo', '\u{1F30A}  New wave! Enemies get tougher but you earn more XP.', 5);
+        } else {
+          this.renderer?.showTutorialHint('combo', 'Kill enemies quickly to build combos for bonus score!', 5);
+        }
       }
     }
   }
@@ -1868,6 +1908,14 @@ export class GameEngine {
     this.state.gameOver = true;
     this.audio.stopMusic();
     this.audio.playGameOver();
+
+    // Mark first run complete so onboarding hints don't repeat
+    if (this.isFirstRun) {
+      this.isFirstRun = false;
+      try {
+        localStorage.setItem('void-survivors-first-run', 'true');
+      } catch { /* localStorage unavailable */ }
+    }
     this.particles.emitExplosion(
       this.state.player.pos.x,
       this.state.player.pos.y,

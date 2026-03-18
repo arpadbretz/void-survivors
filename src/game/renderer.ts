@@ -110,7 +110,7 @@ export class Renderer {
   private waveAnnouncePreview: string | undefined = undefined;
 
   // Tutorial hint system
-  private tutorialHints: { text: string; time: number; duration: number }[] = [];
+  private tutorialHints: { text: string; time: number; duration: number; isPulsing: boolean }[] = [];
   private tutorialShown: Set<string> = new Set();
 
   // Synergy notification system
@@ -2524,7 +2524,8 @@ export class Renderer {
     if (!this.tutorialHintsEnabled) return;
     if (this.tutorialShown.has(id)) return;
     this.tutorialShown.add(id);
-    this.tutorialHints.push({ text, time: performance.now() / 1000, duration });
+    const isPulsing = id === 'move'; // WASD hint gets pulsing indicator
+    this.tutorialHints.push({ text, time: performance.now() / 1000, duration, isPulsing });
   }
 
   private drawTutorialHints(): void {
@@ -2544,30 +2545,52 @@ export class Renderer {
       ctx.globalAlpha = alpha;
       ctx.textAlign = 'center';
 
-      // Background pill
-      ctx.font = '13px monospace';
+      // Measure text to size banner
+      ctx.font = '14px monospace';
       const textWidth = ctx.measureText(hint.text).width;
-      const pillWidth = textWidth + 40;
-      const pillX = this.width / 2 - pillWidth / 2;
-      const pillY = this.height * 0.7 + offsetY;
+      const bannerPadX = 32;
+      const bannerPadY = 10;
+      const bannerW = textWidth + bannerPadX * 2;
+      const bannerH = 38;
+      const bannerX = this.width / 2 - bannerW / 2;
+      const bannerY = 48 + offsetY;
 
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+      // Dark semi-transparent background
+      ctx.fillStyle = 'rgba(5, 8, 18, 0.85)';
       ctx.beginPath();
-      ctx.roundRect(pillX, pillY, pillWidth, 32, 16);
+      ctx.roundRect(bannerX, bannerY, bannerW, bannerH, 6);
       ctx.fill();
 
-      ctx.strokeStyle = 'rgba(0, 240, 255, 0.4)';
-      ctx.lineWidth = 1;
+      // Cyan border lines on top and bottom
+      ctx.strokeStyle = 'rgba(0, 240, 255, 0.6)';
+      ctx.lineWidth = 1.5;
+      // Top border line
       ctx.beginPath();
-      ctx.roundRect(pillX, pillY, pillWidth, 32, 16);
+      ctx.moveTo(bannerX + 6, bannerY);
+      ctx.lineTo(bannerX + bannerW - 6, bannerY);
+      ctx.stroke();
+      // Bottom border line
+      ctx.beginPath();
+      ctx.moveTo(bannerX + 6, bannerY + bannerH);
+      ctx.lineTo(bannerX + bannerW - 6, bannerY + bannerH);
       ctx.stroke();
 
+      // Pulsing dot indicator for the WASD hint
+      if (hint.isPulsing) {
+        const pulse = 0.5 + 0.5 * Math.sin(now * 4);
+        const dotRadius = 3 + pulse * 2;
+        ctx.fillStyle = `rgba(0, 240, 255, ${0.5 + pulse * 0.5})`;
+        ctx.beginPath();
+        ctx.arc(bannerX + 16, bannerY + bannerH / 2, dotRadius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
       // Text
-      ctx.fillStyle = '#00f0ff';
-      ctx.fillText(hint.text, this.width / 2, pillY + 21);
+      ctx.fillStyle = '#d0f8ff';
+      ctx.fillText(hint.text, this.width / 2, bannerY + bannerH / 2 + 5);
 
       ctx.restore();
-      offsetY += 40;
+      offsetY += bannerH + 6;
     }
   }
 

@@ -163,6 +163,121 @@ function formatTime(seconds: number): string {
 }
 
 // ---------------------------------------------------------------------------
+// Share Card Generator — creates a neon-themed canvas image from run stats
+// ---------------------------------------------------------------------------
+async function generateShareCard(stats: GameOverStats, characterName: string, characterIcon: string): Promise<Blob | null> {
+  const W = 600, H = 340;
+  const canvas = document.createElement("canvas");
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+
+  // Background
+  const bg = ctx.createLinearGradient(0, 0, W, H);
+  bg.addColorStop(0, "#08081a");
+  bg.addColorStop(1, "#0e0e24");
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  // Grid pattern
+  ctx.strokeStyle = "rgba(0,240,255,0.06)";
+  ctx.lineWidth = 0.5;
+  for (let x = 0; x < W; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+  for (let y = 0; y < H; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+
+  // Decorative shapes
+  ctx.globalAlpha = 0.15;
+  ctx.fillStyle = "#ff3344";
+  ctx.fillRect(30, 50, 12, 12);
+  ctx.fillStyle = "#aa44ff";
+  ctx.fillRect(W - 50, H - 70, 10, 10);
+  ctx.fillStyle = "#ff8800";
+  ctx.fillRect(W - 80, 40, 8, 8);
+  ctx.globalAlpha = 1;
+
+  // Title
+  ctx.textAlign = "center";
+  ctx.font = "900 32px system-ui, -apple-system, sans-serif";
+  const titleGrad = ctx.createLinearGradient(W / 2 - 120, 0, W / 2 + 120, 0);
+  titleGrad.addColorStop(0, "#00f0ff");
+  titleGrad.addColorStop(1, "#ff00aa");
+  ctx.fillStyle = titleGrad;
+  ctx.fillText("VOID SURVIVORS", W / 2, 42);
+
+  // Character badge
+  ctx.font = "600 13px monospace";
+  ctx.fillStyle = "rgba(224,224,240,0.5)";
+  ctx.fillText(`${characterIcon} ${characterName}`, W / 2, 62);
+
+  // Score (big center number)
+  ctx.font = "900 52px monospace";
+  ctx.fillStyle = "#00eeff";
+  ctx.fillText(stats.score.toLocaleString(), W / 2, 120);
+
+  ctx.font = "700 11px monospace";
+  ctx.fillStyle = "rgba(224,224,240,0.35)";
+  ctx.letterSpacing = "0.2em";
+  ctx.fillText("SCORE", W / 2, 138);
+
+  // Stats grid (2 rows x 3 cols)
+  const statItems = [
+    { label: "WAVE", value: String(stats.wavesSurvived), color: "#00f0ff" },
+    { label: "KILLS", value: stats.enemiesKilled.toLocaleString(), color: "#ff00aa" },
+    { label: "TIME", value: formatTime(stats.timeSurvived), color: "#00ff88" },
+    { label: "LEVEL", value: String(stats.level), color: "#ffdd00" },
+    { label: "COMBO", value: `${stats.longestCombo}x`, color: "#ff8800" },
+    { label: "DAMAGE", value: stats.damageDealt.toLocaleString(), color: "#aa66ff" },
+  ];
+
+  const cols = 3, startY = 170, rowH = 65, colW = W / 3;
+  for (let i = 0; i < statItems.length; i++) {
+    const col = i % cols, row = Math.floor(i / cols);
+    const cx = colW * col + colW / 2;
+    const cy = startY + row * rowH;
+
+    // Value
+    ctx.font = "800 22px monospace";
+    ctx.fillStyle = statItems[i].color;
+    ctx.fillText(statItems[i].value, cx, cy);
+
+    // Label
+    ctx.font = "600 9px monospace";
+    ctx.fillStyle = "rgba(224,224,240,0.3)";
+    ctx.fillText(statItems[i].label, cx, cy + 16);
+  }
+
+  // CTA
+  ctx.font = "600 13px system-ui, -apple-system, sans-serif";
+  ctx.fillStyle = "rgba(224,224,240,0.45)";
+  ctx.fillText("Can you beat my score?", W / 2, H - 32);
+
+  // URL
+  ctx.font = "600 11px monospace";
+  ctx.fillStyle = "rgba(0,240,255,0.4)";
+  ctx.fillText("void-survivors.vercel.app", W / 2, H - 14);
+
+  // Border
+  ctx.strokeStyle = "rgba(0,240,255,0.2)";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(2, 2, W - 4, H - 4);
+
+  // Top accent line
+  const accentGrad = ctx.createLinearGradient(0, 0, W, 0);
+  accentGrad.addColorStop(0, "transparent");
+  accentGrad.addColorStop(0.3, "#00f0ff");
+  accentGrad.addColorStop(0.7, "#ff00aa");
+  accentGrad.addColorStop(1, "transparent");
+  ctx.strokeStyle = accentGrad;
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(0, 1); ctx.lineTo(W, 1); ctx.stroke();
+
+  return new Promise<Blob | null>((resolve) => {
+    canvas.toBlob((blob) => resolve(blob), "image/png");
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Loading Tips — shown on game over screen
 // ---------------------------------------------------------------------------
 const LOADING_TIPS: string[] = [
@@ -274,6 +389,7 @@ export default function PlayPage() {
   // PWA install prompt state
   const deferredPromptRef = useRef<Event | null>(null);
   const [showInstallBtn, setShowInstallBtn] = useState(false);
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
 
   // Joystick state
   const joystickRef = useRef<HTMLDivElement>(null);
@@ -511,6 +627,11 @@ export default function PlayPage() {
       });
       statsMod.saveLifetimeStats(updated);
       setLifetimeStats(updated);
+
+      // Show PWA install banner after 2nd game over if installable
+      if (updated.gamesPlayed >= 2 && deferredPromptRef.current) {
+        setTimeout(() => setShowInstallBanner(true), 1500);
+      }
 
       // Save run record for history
       statsMod.saveRunRecord({
@@ -847,29 +968,42 @@ export default function PlayPage() {
   const handleShareScore = useCallback(async () => {
     if (!gameOverStats) return;
 
-    const shareText = isDailyMode && dailyChallenge
-      ? [
-          "\u{1F3AE} Void Survivors \u2014 Daily Challenge",
-          `\u{1F4C5} ${dailyChallenge.title}`,
-          `\u2B50 Score: ${gameOverStats.score.toLocaleString()}`,
-          `\u23F1\uFE0F Time: ${formatTime(gameOverStats.timeSurvived)}`,
-          `\u{1F30A} Wave: ${gameOverStats.wavesSurvived}`,
-          "",
-          "Can you beat my score?",
-          "\u{1F3AE} https://void-survivors.vercel.app",
-        ].join("\n")
-      : [
-          "\u{1F3AE} Void Survivors",
-          `\u2B50 Score: ${gameOverStats.score.toLocaleString()}`,
-          `\u23F1\uFE0F Time: ${formatTime(gameOverStats.timeSurvived)}`,
-          `\u{1F30A} Wave: ${gameOverStats.wavesSurvived}`,
-          `\u2694\uFE0F Kills: ${gameOverStats.enemiesKilled.toLocaleString()}`,
-          `\u{1F3C6} Level: ${gameOverStats.level}`,
-          "",
-          "Can you beat my score?",
-          "\u{1F3AE} https://void-survivors.vercel.app",
-        ].join("\n");
+    const charDef = characterDefs.find(c => c.id === selectedCharacter);
+    const charName = charDef?.name || "Void Walker";
+    const charIcon = charDef?.icon || "\u{1F4A0}";
 
+    const shareText = [
+      "\u{1F3AE} Void Survivors",
+      `\u2B50 Score: ${gameOverStats.score.toLocaleString()}`,
+      `\u{1F30A} Wave ${gameOverStats.wavesSurvived} \u2022 ${formatTime(gameOverStats.timeSurvived)} \u2022 ${gameOverStats.enemiesKilled} kills`,
+      "",
+      "Can you beat my score?",
+      "\u{1F3AE} https://void-survivors.vercel.app",
+    ].join("\n");
+
+    // Try image-based sharing first (more engaging on social media)
+    const shareBlob = await generateShareCard(gameOverStats, charName, charIcon);
+
+    if (typeof navigator !== "undefined" && navigator.share && shareBlob) {
+      const file = new File([shareBlob], "void-survivors-score.png", { type: "image/png" });
+      // Check if sharing files is supported
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({
+            text: shareText,
+            files: [file],
+          });
+          setShareStatus("shared");
+          setTimeout(() => setShareStatus("idle"), 2000);
+          return;
+        } catch {
+          // User cancelled — do nothing
+          return;
+        }
+      }
+    }
+
+    // Fallback: text-only share or clipboard
     if (typeof navigator !== "undefined" && navigator.share) {
       try {
         await navigator.share({
@@ -879,7 +1013,6 @@ export default function PlayPage() {
         });
         setShareStatus("shared");
       } catch {
-        // User cancelled or share failed — do nothing
         return;
       }
     } else {
@@ -887,13 +1020,12 @@ export default function PlayPage() {
         await navigator.clipboard.writeText(shareText);
         setShareStatus("copied");
       } catch {
-        // Clipboard unavailable
         return;
       }
     }
 
     setTimeout(() => setShareStatus("idle"), 2000);
-  }, [gameOverStats, isDailyMode, dailyChallenge]);
+  }, [gameOverStats, selectedCharacter, characterDefs]);
 
   // -----------------------------------------------------------------------
   // Sound toggle
@@ -1032,6 +1164,7 @@ export default function PlayPage() {
             justifyContent: "center",
             zIndex: 20,
             background: "rgba(10, 10, 18, 0.7)",
+            animation: "fadeIn 0.3s ease-out",
           }}
         >
           <div className="animate-slide-up" style={{ textAlign: "center" }}>
@@ -1498,6 +1631,7 @@ export default function PlayPage() {
             background: "rgba(10, 10, 18, 0.92)",
             overflow: "auto",
             padding: "40px 16px",
+            animation: "fadeIn 0.3s ease-out",
           }}
         >
           <h2
@@ -1727,6 +1861,7 @@ export default function PlayPage() {
             background: "rgba(0,0,0,0.9)",
             overflowY: "auto",
             fontFamily: "var(--font-geist-mono), monospace",
+            animation: "fadeIn 0.3s ease-out",
           }}
         >
           <div style={{ width: "100%", maxWidth: 900, padding: "40px 20px" }}>
@@ -2055,6 +2190,7 @@ export default function PlayPage() {
             background: "rgba(0,0,0,0.9)",
             fontFamily: "var(--font-geist-mono), monospace",
             overflow: "auto",
+            animation: "fadeIn 0.3s ease-out",
           }}
         >
           <div style={{ width: "100%", maxWidth: 560, padding: "40px 20px" }}>
@@ -3640,6 +3776,7 @@ export default function PlayPage() {
             zIndex: 30,
             background: "rgba(10, 10, 18, 0.92)",
             backdropFilter: "blur(6px)",
+            animation: "fadeIn 0.3s ease-out",
           }}
         >
           <div
@@ -4664,12 +4801,95 @@ export default function PlayPage() {
                   ? "Shared! \u2713"
                   : shareStatus === "copied"
                   ? "Copied! \u2713"
-                  : "Share \u{1F517}"}
+                  : "\u{1F4F8} Share"}
               </button>
               <button className="btn-neon" onClick={backToMenu}>
                 MENU
               </button>
             </div>
+
+            {/* PWA Install Banner */}
+            {showInstallBanner && deferredPromptRef.current && (
+              <div style={{
+                marginTop: 16,
+                padding: 2,
+                borderRadius: 14,
+                background: "linear-gradient(135deg, #00f0ff, #aa44ff)",
+                maxWidth: 380,
+                width: "100%",
+                animation: "scaleIn 0.4s ease-out",
+              }}>
+                <div style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  padding: "12px 16px",
+                  borderRadius: 12,
+                  background: "rgba(10, 10, 18, 0.95)",
+                  position: "relative",
+                }}>
+                  <span style={{ fontSize: "1.5rem", flexShrink: 0 }}>{"\u{1F4F2}"}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{
+                      fontSize: "0.8rem",
+                      color: "rgba(224,224,240,0.9)",
+                      fontFamily: mono,
+                      lineHeight: 1.4,
+                    }}>
+                      Install Void Survivors for offline play and faster loading
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const prompt = deferredPromptRef.current as (Event & { prompt: () => Promise<{ outcome: string }>; }) | null;
+                      if (!prompt) return;
+                      prompt.prompt().then((result) => {
+                        if (result.outcome === "accepted") {
+                          deferredPromptRef.current = null;
+                          setShowInstallBtn(false);
+                        }
+                      });
+                      setShowInstallBanner(false);
+                    }}
+                    style={{
+                      padding: "6px 16px",
+                      fontSize: "0.75rem",
+                      fontWeight: 800,
+                      letterSpacing: "0.1em",
+                      textTransform: "uppercase",
+                      color: "#0a0a12",
+                      background: "linear-gradient(135deg, #00f0ff, #aa44ff)",
+                      border: "none",
+                      borderRadius: 8,
+                      cursor: "pointer",
+                      fontFamily: "var(--font-geist-sans), system-ui, sans-serif",
+                      flexShrink: 0,
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    Install
+                  </button>
+                  <button
+                    onClick={() => setShowInstallBanner(false)}
+                    style={{
+                      position: "absolute",
+                      top: 4,
+                      right: 6,
+                      background: "none",
+                      border: "none",
+                      color: "rgba(224,224,240,0.4)",
+                      cursor: "pointer",
+                      fontSize: "0.9rem",
+                      lineHeight: 1,
+                      padding: "2px 4px",
+                    }}
+                    aria-label="Dismiss install banner"
+                  >
+                    {"\u2715"}
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Loading Tip */}
             <div style={{
@@ -4709,7 +4929,7 @@ export default function PlayPage() {
 
       {/* ============== Leaderboard Screen ============== */}
       {screen === "leaderboard" && (
-        <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", zIndex: 30, background: "rgba(10, 10, 18, 0.92)", backdropFilter: "blur(6px)" }}>
+        <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", zIndex: 30, background: "rgba(10, 10, 18, 0.92)", backdropFilter: "blur(6px)", animation: "fadeIn 0.3s ease-out" }}>
           <div style={{ textAlign: "center", maxWidth: 520, width: "90%", maxHeight: "85vh", overflowY: "auto", padding: "0 20px" }}>
             <h2 style={{ fontSize: "clamp(1.6rem, 3.5vw, 2.2rem)", fontWeight: 900, color: "#ffaa00", letterSpacing: "0.12em", marginBottom: 8, textShadow: "0 0 10px rgba(255,170,0,0.6)" }}>
               {"\u{1F3C6}"} LEADERBOARD
