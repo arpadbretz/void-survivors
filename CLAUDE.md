@@ -74,6 +74,8 @@
 - Passive XP trickle scales with wave, wave completion bonus XP
 - Game over tips: 14 random gameplay tips shown after each run
 - Wave announcement shows enemy type preview
+- Boss enrage timer: bosses enrage after 45s alive (+50% speed, +30% damage, red pulsing overlay)
+- Arcanist `cooldownReduction: 0.85` — 15% faster ability cooldowns, applied multiplicatively with synergies
 
 ## Performance Rules
 - Never use `shadowBlur` in the render loop
