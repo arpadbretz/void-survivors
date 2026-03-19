@@ -879,6 +879,8 @@ export default function PlayPage() {
     engineRef.current.setSoundEnabled(soundEnabled);
     engineRef.current.applyDisplaySettings(gameSettings);
     setScreen("playing");
+    // Fire-and-forget analytics
+    try { fetch('/api/analytics', { method: 'POST' }).catch(() => {}); } catch {}
   }, [handleStateChange, handleLevelUp, handleGameOver, handleAchievementCheck, soundEnabled, selectedCharacter, selectedDifficulty, selectedTrailColor, gameSettings]);
 
   // -----------------------------------------------------------------------
@@ -900,6 +902,8 @@ export default function PlayPage() {
     engineRef.current.applyDisplaySettings(gameSettings);
     setIsDailyMode(true);
     setScreen("playing");
+    // Fire-and-forget analytics
+    try { fetch('/api/analytics', { method: 'POST' }).catch(() => {}); } catch {}
   }, [handleStateChange, handleLevelUp, handleGameOver, handleAchievementCheck, soundEnabled, selectedCharacter, dailyChallenge, gameSettings]);
 
   // -----------------------------------------------------------------------
@@ -931,6 +935,8 @@ export default function PlayPage() {
     });
     engineRef.current?.applyDisplaySettings(gameSettings);
     setScreen("playing");
+    // Fire-and-forget analytics
+    try { fetch('/api/analytics', { method: 'POST' }).catch(() => {}); } catch {}
   }, [handleStateChange, handleLevelUp, handleGameOver, handleAchievementCheck, selectedCharacter, selectedDifficulty, gameSettings]);
 
   const resumeGame = useCallback(() => {

@@ -106,7 +106,8 @@ export default function PrivacyPolicyPage() {
       <h2 style={heading2}>2. What Data We Collect</h2>
       <p style={paragraph}>
         Void Survivors is designed to collect as little data as possible. We do{" "}
-        <strong>not</strong> use analytics, advertising, or third-party tracking.
+        <strong>not</strong> use advertising or third-party tracking. We use only
+        privacy-friendly, cookie-free analytics as described below.
       </p>
       <ul style={list}>
         <li>
@@ -119,6 +120,22 @@ export default function PrivacyPolicyPage() {
           submit a score, we store only your <em>player name</em> and{" "}
           <em>score</em> on our server. No account, email, or other personal
           data is required.
+        </li>
+        <li>
+          <strong>Page view analytics</strong> &mdash; we use Vercel Web
+          Analytics to collect anonymized page view data. This service is
+          cookie-free, does not collect personal data, and is fully
+          privacy-compliant.
+        </li>
+        <li>
+          <strong>Anonymized game session counts</strong> &mdash; we record how
+          many games are played per day. No personal data is stored alongside
+          these counts.
+        </li>
+        <li>
+          <strong>Daily/weekly active player counts</strong> &mdash; we use a
+          one-way hash of connection metadata to count unique players. No raw IP
+          addresses or other identifiable information is stored.
         </li>
       </ul>
 
@@ -137,15 +154,17 @@ export default function PrivacyPolicyPage() {
       </p>
       <ul style={list}>
         <li>
-          <strong>Vercel Inc.</strong> (hosting) &mdash; 340 S Lemon Ave #4133
-          Walnut, CA 91789, USA &mdash;{" "}
+          <strong>Vercel Inc.</strong> (hosting &amp; anonymized page view
+          analytics) &mdash; 340 S Lemon Ave #4133 Walnut, CA 91789, USA
+          &mdash; privacy-compliant, cookie-free analytics &mdash;{" "}
           <a href="mailto:privacy@vercel.com" style={{ color: "var(--neon-cyan)" }}>
             privacy@vercel.com
           </a>
         </li>
         <li>
-          <strong>Upstash Inc.</strong> (leaderboard database) &mdash; stores
-          player name + score only
+          <strong>Upstash Inc.</strong> (leaderboard database &amp; anonymized
+          player counts) &mdash; stores player name + score for leaderboard;
+          anonymized session and active player counts only
         </li>
       </ul>
 
@@ -245,7 +264,9 @@ export default function PrivacyPolicyPage() {
       <h2 style={heading2}>2. Milyen adatokat gy&#369;jt&uuml;nk</h2>
       <p style={paragraph}>
         A Void Survivors a lehet&#337; legkevesebb adatot gy&#369;jti. <strong>Nem</strong>{" "}
-        haszn&aacute;lunk analitik&aacute;t, hirdet&eacute;seket vagy harmadik f&eacute;l &aacute;ltali k&ouml;vet&eacute;st.
+        haszn&aacute;lunk hirdet&eacute;seket vagy harmadik f&eacute;l &aacute;ltali k&ouml;vet&eacute;st.
+        Kiz&aacute;r&oacute;lag adatv&eacute;delmi szempontb&oacute;l bar&aacute;ts&aacute;gos, s&uuml;timentes
+        analitik&aacute;t haszn&aacute;lunk az al&aacute;bbiak szerint.
       </p>
       <ul style={list}>
         <li>
@@ -259,6 +280,24 @@ export default function PrivacyPolicyPage() {
           <em>pontsz&aacute;mot</em> t&aacute;roljuk. Nem sz&uuml;ks&eacute;ges fi&oacute;k, email
           vagy m&aacute;s szem&eacute;lyes adat.
         </li>
+        <li>
+          <strong>Oldallátogatási analitika</strong> &mdash; a Vercel Web
+          Analytics szolg&aacute;ltat&aacute;st haszn&aacute;ljuk anonimiz&aacute;lt
+          oldallátogatási adatok gy&#369;jt&eacute;s&eacute;re. Ez a szolg&aacute;ltat&aacute;s
+          s&uuml;timentes, nem gy&#369;jt szem&eacute;lyes adatokat, &eacute;s teljes
+          m&eacute;rt&eacute;kben adatv&eacute;delmi szempontb&oacute;l megfelel&#337;.
+        </li>
+        <li>
+          <strong>Anonimiz&aacute;lt j&aacute;t&eacute;kmenet-sz&aacute;ml&aacute;l&oacute;</strong> &mdash;
+          r&ouml;gz&iacute;tj&uuml;k, h&aacute;ny j&aacute;t&eacute;kot j&aacute;tszanak naponta. Ezek
+          mellett semmilyen szem&eacute;lyes adatot nem t&aacute;rolunk.
+        </li>
+        <li>
+          <strong>Napi/heti akt&iacute;v j&aacute;t&eacute;kosok sz&aacute;ma</strong> &mdash; a
+          kapcsol&oacute;d&aacute;si metaadatok egyir&aacute;ny&uacute; hash-&eacute;t haszn&aacute;ljuk az
+          egyedi j&aacute;t&eacute;kosok sz&aacute;mol&aacute;s&aacute;hoz. Nem t&aacute;rolunk nyers IP-c&iacute;meket
+          vagy m&aacute;s azonos&iacute;that&oacute; inform&aacute;ci&oacute;t.
+        </li>
       </ul>
 
       <h2 style={heading2}>3. S&uuml;tik &eacute;s helyi t&aacute;rhely</h2>
@@ -271,12 +310,16 @@ export default function PrivacyPolicyPage() {
       <h2 style={heading2}>4. Adatfeldolgoz&oacute;k</h2>
       <ul style={list}>
         <li>
-          <strong>Vercel Inc.</strong> (t&aacute;rhely) &mdash; 340 S Lemon Ave #4133
-          Walnut, CA 91789, USA
+          <strong>Vercel Inc.</strong> (t&aacute;rhely &eacute;s anonimiz&aacute;lt
+          oldallátogatási analitika) &mdash; 340 S Lemon Ave #4133
+          Walnut, CA 91789, USA &mdash; adatv&eacute;delmi szempontb&oacute;l
+          megfelel&#337;, s&uuml;timentes analitika
         </li>
         <li>
-          <strong>Upstash Inc.</strong> (ranglista adatb&aacute;zis) &mdash; csak
-          j&aacute;t&eacute;kosn&eacute;v + pontsz&aacute;m
+          <strong>Upstash Inc.</strong> (ranglista adatb&aacute;zis &eacute;s anonimiz&aacute;lt
+          j&aacute;t&eacute;kos-sz&aacute;ml&aacute;l&oacute;k) &mdash; j&aacute;t&eacute;kosn&eacute;v + pontsz&aacute;m a
+          ranglist&aacute;hoz; kiz&aacute;r&oacute;lag anonimiz&aacute;lt munkamenet- &eacute;s akt&iacute;v
+          j&aacute;t&eacute;kos-sz&aacute;ml&aacute;l&oacute;k
         </li>
       </ul>
 

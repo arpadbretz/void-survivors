@@ -51,8 +51,8 @@ export default function CookieBanner() {
     >
       <style>{`@keyframes cookieBannerSlideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}`}</style>
       <span>
-        This site uses essential browser storage (localStorage) for game saves.
-        No tracking cookies are used.
+        This site uses cookie-free analytics and essential browser storage
+        (localStorage) for game saves. No cookies are used.
       </span>
       <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
         <button
