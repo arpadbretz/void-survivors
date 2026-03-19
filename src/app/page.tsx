@@ -1439,31 +1439,64 @@ export default function HomePage() {
         style={{
           position: "relative",
           zIndex: 10,
-          borderTop: "1px solid rgba(255,255,255,0.04)",
-          padding: "32px clamp(20px, 5vw, 60px)",
+          background: "#07070d",
+          borderTop: "1px solid rgba(0,240,255,0.15)",
+          padding: "32px clamp(20px, 5vw, 60px) 24px",
+          textAlign: "center",
           display: "flex",
-          justifyContent: "space-between",
+          flexDirection: "column",
           alignItems: "center",
-          flexWrap: "wrap",
-          gap: 12,
+          gap: 14,
         }}
       >
-        <span
+        <nav
           style={{
-            fontSize: "0.8rem",
-            color: "rgba(224,224,240,0.3)",
+            display: "flex",
+            gap: "clamp(16px, 3vw, 32px)",
+            flexWrap: "wrap",
+            justifyContent: "center",
           }}
         >
-          Built by Prometheus Digital Kft.
-        </span>
+          {[
+            { href: "/legal/privacy", label: "Privacy Policy" },
+            { href: "/legal/terms", label: "Terms of Service" },
+            { href: "/legal/impressum", label: "Impressum" },
+          ].map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              className="text-[0.8rem] text-[rgba(224,224,240,0.4)] no-underline transition-colors duration-200 hover:text-[#00f0ff]"
+            >
+              {link.label}
+            </Link>
+          ))}
+          <a
+            href="https://github.com/arpadbretz/void-survivors"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[0.8rem] text-[rgba(224,224,240,0.4)] no-underline transition-colors duration-200 hover:text-[#00f0ff]"
+          >
+            GitHub
+          </a>
+        </nav>
+
         <span
           style={{
-            fontSize: "0.8rem",
-            color: "rgba(224,224,240,0.2)",
+            fontSize: "0.75rem",
+            color: "rgba(224,224,240,0.25)",
+          }}
+        >
+          &copy; 2026 Prometheus Digital Kft. &mdash; All rights reserved
+        </span>
+
+        <span
+          style={{
+            fontSize: "0.7rem",
+            color: "rgba(224,224,240,0.18)",
             fontStyle: "italic",
           }}
         >
-          Powered by pure math and geometry
+          Made with ❤️ and AI
         </span>
       </footer>
     </div>
