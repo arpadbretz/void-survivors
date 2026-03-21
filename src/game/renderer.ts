@@ -1934,7 +1934,8 @@ export class Renderer {
   ): void {
     const ctx = this.ctx;
     const barHeight = 3;
-    const ratio = health / maxHealth;
+    if (maxHealth <= 0) return;
+    const ratio = Math.min(1, Math.max(0, health / maxHealth));
 
     // Background
     ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';

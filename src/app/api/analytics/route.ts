@@ -108,18 +108,23 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// ── GET — Return current stats (internal use) ──────────────
+// ── GET — Return stats (internal use) ───────────────────────
+// ?days=7 returns last 7 days of history (default: today only)
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const r = getRedis();
   if (!r) {
     return NextResponse.json({ error: 'Analytics not configured' }, { status: 503 });
   }
 
   try {
+    const { searchParams } = new URL(request.url);
+    const days = Math.min(parseInt(searchParams.get('days') || '1'), 90);
+
     const dateKey = getDateKey();
     const weekKey = getWeekKey();
 
+    // Always include today's summary
     const [todayGames, todayDAU, weekWAU, totalGames] = await Promise.all([
       r.get<number>(`analytics:games:${dateKey}`),
       r.scard(`analytics:dau:${dateKey}`),
@@ -127,14 +132,49 @@ export async function GET() {
       r.get<number>('analytics:total_games'),
     ]);
 
-    return NextResponse.json({
+    const result: Record<string, unknown> = {
       date: dateKey,
       week: weekKey,
       today_games: todayGames || 0,
       today_dau: todayDAU || 0,
       week_wau: weekWAU || 0,
       total_games: totalGames || 0,
-    });
+    };
+
+    // If requesting history, fetch daily stats for past N days
+    if (days > 1) {
+      const history: Array<{ date: string; games: number; dau: number }> = [];
+      const now = new Date();
+
+      const fetches: Promise<[number | null, number]>[] = [];
+      const dates: string[] = [];
+
+      for (let i = 0; i < days; i++) {
+        const d = new Date(now);
+        d.setDate(d.getDate() - i);
+        const dk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        dates.push(dk);
+        fetches.push(
+          Promise.all([
+            r.get<number>(`analytics:games:${dk}`),
+            r.scard(`analytics:dau:${dk}`),
+          ])
+        );
+      }
+
+      const results = await Promise.all(fetches);
+      for (let i = 0; i < dates.length; i++) {
+        history.push({
+          date: dates[i],
+          games: results[i][0] || 0,
+          dau: results[i][1] || 0,
+        });
+      }
+
+      result.history = history;
+    }
+
+    return NextResponse.json(result);
   } catch (err) {
     console.error('Analytics GET error:', err);
     return NextResponse.json({ error: 'Failed to fetch analytics' }, { status: 500 });
