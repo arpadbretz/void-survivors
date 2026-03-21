@@ -236,72 +236,31 @@ export default function HomePage() {
         >
           VOID SURVIVORS
         </span>
-        <nav style={{ display: "flex", gap: 24, alignItems: "center" }}>
-          <a
-            href="#features"
-            aria-label="View game features"
-            style={{
-              color: "rgba(224,224,240,0.5)",
-              textDecoration: "none",
-              fontSize: "0.9rem",
-              letterSpacing: "0.05em",
-              transition: "color 0.2s",
-            }}
-          >
-            Features
-          </a>
-          <a
-            href="#how-to-play"
-            aria-label="Learn how to play Void Survivors"
-            style={{
-              color: "rgba(224,224,240,0.5)",
-              textDecoration: "none",
-              fontSize: "0.9rem",
-              letterSpacing: "0.05em",
-              transition: "color 0.2s",
-            }}
-          >
-            How to Play
-          </a>
-          <a
-            href="#controls"
-            aria-label="View keyboard controls"
-            style={{
-              color: "rgba(224,224,240,0.5)",
-              textDecoration: "none",
-              fontSize: "0.9rem",
-              letterSpacing: "0.05em",
-              transition: "color 0.2s",
-            }}
-          >
-            Controls
-          </a>
-          <a
-            href="#whats-new"
-            aria-label="See latest updates and patch notes"
-            style={{
-              color: "rgba(224,224,240,0.5)",
-              textDecoration: "none",
-              fontSize: "0.9rem",
-              letterSpacing: "0.05em",
-              transition: "color 0.2s",
-            }}
-          >
-            What&apos;s New
-          </a>
-          <a
-            href="#faq"
-            aria-label="Frequently asked questions about Void Survivors"
-            style={{
-              color: "rgba(224,224,240,0.5)",
-              textDecoration: "none",
-              fontSize: "0.9rem",
-              letterSpacing: "0.05em",
-              transition: "color 0.2s",
-            }}
-          >
-            FAQ
-          </a>
+        <style dangerouslySetInnerHTML={{ __html: `@media(max-width:1023px){.nav-links-desktop{display:none!important}}` }} />
+        <nav style={{ display: "flex", gap: "clamp(8px, 2vw, 24px)", alignItems: "center" }}>
+          <div className="nav-links-desktop" style={{ display: "flex", gap: 24, alignItems: "center" }}>
+            {[
+              { href: "#features", label: "Features" },
+              { href: "#how-to-play", label: "How to Play" },
+              { href: "#controls", label: "Controls" },
+              { href: "#whats-new", label: "What's New" },
+              { href: "#faq", label: "FAQ" },
+            ].map((link) => (
+              <a
+                key={link.href}
+                href={link.href}
+                style={{
+                  color: "rgba(224,224,240,0.5)",
+                  textDecoration: "none",
+                  fontSize: "0.9rem",
+                  letterSpacing: "0.05em",
+                  transition: "color 0.2s",
+                }}
+              >
+                {link.label}
+              </a>
+            ))}
+          </div>
           <Link
             href="/play"
             className="btn-neon"
@@ -445,7 +404,7 @@ export default function HomePage() {
           <FeatureCard
             icon={"🎭"}
             title="5 Characters"
-            description="Choose from 4 unique characters — the balanced Void Walker, glass-cannon Phantom, tanky Sentinel, and ability-focused Arcanist. Unlock more as you play."
+            description="Choose from 5 unique characters — balanced Void Walker, glass-cannon Phantom, tanky Sentinel, ability-focused Arcanist, and time-bending Chronomancer."
           />
           <FeatureCard
             icon={"🏅"}
@@ -1367,7 +1326,7 @@ export default function HomePage() {
           { value: "9", label: "Enemy Types" },
           { value: "5", label: "Characters" },
           { value: "40", label: "Achievements" },
-          { value: "7", label: "Synergies" },
+          { value: "8", label: "Synergies" },
         ].map((stat) => (
           <div
             key={stat.label}
