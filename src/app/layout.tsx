@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const SITE_URL = "https://void-survivors.vercel.app";
+const SITE_URL = "https://voidsurvivors.eu";
 const TITLE = "Void Survivors — A Neon Roguelike";
 const DESCRIPTION =
   "Play Void Survivors free in your browser — a neon roguelike survivors game with 12 abilities, 7 evolutions, 7 synergies, 9 enemy types, 5 elite variants, 3 bosses, 5 characters, 40 achievements, mini-map, upgrade rerolls, global leaderboard, daily challenges, and meta-progression. No download required.";

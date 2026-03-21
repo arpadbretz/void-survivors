@@ -86,6 +86,20 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// ── Rate Limiting ───────────────────────────────────────────
+
+const RATE_LIMIT_WINDOW = 60; // seconds
+const RATE_LIMIT_MAX = 5; // max submissions per window per IP
+
+async function checkRateLimit(r: Redis, ip: string): Promise<boolean> {
+  const key = `rl:lb:${ip}`;
+  const count = await r.incr(key);
+  if (count === 1) {
+    await r.expire(key, RATE_LIMIT_WINDOW);
+  }
+  return count <= RATE_LIMIT_MAX;
+}
+
 // ── POST — Submit a score ───────────────────────────────────
 
 export async function POST(request: NextRequest) {
@@ -95,6 +109,13 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    // Rate limit by IP
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+    const allowed = await checkRateLimit(r, ip);
+    if (!allowed) {
+      return NextResponse.json({ error: 'Too many submissions, try again later' }, { status: 429 });
+    }
+
     const body = await request.json();
     const { name, score, wave, time, kills, level } = body;
 

@@ -184,7 +184,7 @@ export async function GET(req: NextRequest) {
             letterSpacing: '0.1em',
           }}
         >
-          void-survivors.vercel.app
+          voidsurvivors.eu
         </div>
       </div>
     ),

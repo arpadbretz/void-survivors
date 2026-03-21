@@ -256,7 +256,7 @@ async function generateShareCard(stats: GameOverStats, characterName: string, ch
   // URL
   ctx.font = "600 11px monospace";
   ctx.fillStyle = "rgba(0,240,255,0.4)";
-  ctx.fillText("void-survivors.vercel.app", W / 2, H - 14);
+  ctx.fillText("voidsurvivors.eu", W / 2, H - 14);
 
   // Border
   ctx.strokeStyle = "rgba(0,240,255,0.2)";
@@ -1018,7 +1018,7 @@ export default function PlayPage() {
       character: charName,
       time: String(Math.floor(stats.timeSurvived)),
     });
-    return `${typeof window !== "undefined" ? window.location.origin : "https://void-survivors.vercel.app"}/api/share?${params.toString()}`;
+    return `${typeof window !== "undefined" ? window.location.origin : "https://voidsurvivors.eu"}/api/share?${params.toString()}`;
   }, [selectedCharacter, characterDefs, playerName]);
 
   const handleShareScore = useCallback(async () => {

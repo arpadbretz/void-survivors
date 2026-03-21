@@ -2,7 +2,7 @@
 
 A browser-based roguelike survivors game with a neon geometric aesthetic. Survive waves of enemies, level up, and unlock powerful abilities.
 
-**[Play Now](https://void-survivors.vercel.app)**
+**[Play Now](https://voidsurvivors.eu)**
 
 ![Void Survivors Screenshot](public/screenshot.png)
 

@@ -205,7 +205,7 @@ export default async function Image() {
             fontFamily: 'monospace',
           }}
         >
-          void-survivors.vercel.app
+          voidsurvivors.eu
         </div>
 
         {/* Border */}

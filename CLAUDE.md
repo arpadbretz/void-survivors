@@ -5,7 +5,7 @@
 - Next.js 16.1.7 (App Router, static site generation)
 - React 19, TypeScript 5, Tailwind CSS v4, HTML5 Canvas 2D
 - Deployed on Vercel Hobby plan (free tier)
-- Live: https://void-survivors.vercel.app
+- Live: https://voidsurvivors.eu
 - Repo: https://github.com/arpadbretz/void-survivors
 - Author: Prometheus Digital Kft.
 
