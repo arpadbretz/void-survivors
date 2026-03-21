@@ -1005,6 +1005,22 @@ export default function PlayPage() {
   // -----------------------------------------------------------------------
   // Share score
   // -----------------------------------------------------------------------
+
+  const buildShareUrl = useCallback((stats: GameOverStats) => {
+    const charDef = characterDefs.find(c => c.id === selectedCharacter);
+    const charName = charDef?.name || "Void Walker";
+    const pName = playerName || "Survivor";
+    const params = new URLSearchParams({
+      name: pName,
+      score: String(stats.score),
+      wave: String(stats.wavesSurvived),
+      kills: String(stats.enemiesKilled),
+      character: charName,
+      time: String(Math.floor(stats.timeSurvived)),
+    });
+    return `${typeof window !== "undefined" ? window.location.origin : "https://void-survivors.vercel.app"}/api/share?${params.toString()}`;
+  }, [selectedCharacter, characterDefs, playerName]);
+
   const handleShareScore = useCallback(async () => {
     if (!gameOverStats) return;
 
@@ -1012,14 +1028,9 @@ export default function PlayPage() {
     const charName = charDef?.name || "Void Walker";
     const charIcon = charDef?.icon || "\u{1F4A0}";
 
-    const shareText = [
-      "\u{1F3AE} Void Survivors",
-      `\u2B50 Score: ${gameOverStats.score.toLocaleString()}`,
-      `\u{1F30A} Wave ${gameOverStats.wavesSurvived} \u2022 ${formatTime(gameOverStats.timeSurvived)} \u2022 ${gameOverStats.enemiesKilled} kills`,
-      "",
-      "Can you beat my score?",
-      "\u{1F3AE} https://void-survivors.vercel.app",
-    ].join("\n");
+    const shareUrl = buildShareUrl(gameOverStats);
+
+    const shareText = `I survived ${gameOverStats.wavesSurvived} waves and scored ${gameOverStats.score.toLocaleString()} points in Void Survivors!`;
 
     // Try image-based sharing first (more engaging on social media)
     const shareBlob = await generateShareCard(gameOverStats, charName, charIcon);
@@ -1049,7 +1060,7 @@ export default function PlayPage() {
         await navigator.share({
           title: "Void Survivors",
           text: shareText,
-          url: "https://void-survivors.vercel.app",
+          url: shareUrl,
         });
         setShareStatus("shared");
       } catch {
@@ -1057,7 +1068,7 @@ export default function PlayPage() {
       }
     } else {
       try {
-        await navigator.clipboard.writeText(shareText);
+        await navigator.clipboard.writeText(`${shareText}\n${shareUrl}`);
         setShareStatus("copied");
       } catch {
         return;
@@ -1065,7 +1076,18 @@ export default function PlayPage() {
     }
 
     setTimeout(() => setShareStatus("idle"), 2000);
-  }, [gameOverStats, selectedCharacter, characterDefs]);
+  }, [gameOverStats, selectedCharacter, characterDefs, buildShareUrl]);
+
+  const handleShareOnX = useCallback(() => {
+    if (!gameOverStats) return;
+    const shareUrl = buildShareUrl(gameOverStats);
+    const shareText = `I survived ${gameOverStats.wavesSurvived} waves and scored ${gameOverStats.score.toLocaleString()} points in Void Survivors!`;
+    window.open(
+      `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`,
+      '_blank',
+      'noopener,noreferrer'
+    );
+  }, [gameOverStats, buildShareUrl]);
 
   // -----------------------------------------------------------------------
   // Sound toggle
@@ -4986,16 +5008,16 @@ export default function PlayPage() {
                   padding: "10px 24px",
                   borderRadius: 8,
                   border: "none",
-                  background: "linear-gradient(135deg, #8b5cf6, #06b6d4)",
-                  color: "#fff",
-                  fontWeight: 700,
+                  background: "linear-gradient(135deg, #00cc6a, #00ff88)",
+                  color: "#0a0a14",
+                  fontWeight: 800,
                   fontSize: "0.85rem",
                   letterSpacing: "0.08em",
                   cursor: "pointer",
                   textTransform: "uppercase",
                   transition: "opacity 0.2s, transform 0.2s",
                   opacity: shareStatus !== "idle" ? 0.85 : 1,
-                  textShadow: "0 0 8px rgba(139,92,246,0.5)",
+                  textShadow: "0 0 8px rgba(0,255,136,0.3)",
                   minWidth: 140,
                 }}
                 onMouseEnter={(e) => { (e.target as HTMLElement).style.opacity = "0.85"; }}
@@ -5005,7 +5027,27 @@ export default function PlayPage() {
                   ? "Shared! \u2713"
                   : shareStatus === "copied"
                   ? "Copied! \u2713"
-                  : "\u{1F4F8} Share"}
+                  : "\u{1F4E4} Share Run"}
+              </button>
+              <button
+                onClick={handleShareOnX}
+                style={{
+                  padding: "10px 16px",
+                  borderRadius: 8,
+                  border: "1px solid rgba(224,224,240,0.2)",
+                  background: "rgba(224,224,240,0.06)",
+                  color: "rgba(224,224,240,0.8)",
+                  fontWeight: 700,
+                  fontSize: "0.78rem",
+                  letterSpacing: "0.06em",
+                  cursor: "pointer",
+                  textTransform: "uppercase",
+                  transition: "opacity 0.2s",
+                }}
+                onMouseEnter={(e) => { (e.target as HTMLElement).style.opacity = "0.75"; }}
+                onMouseLeave={(e) => { (e.target as HTMLElement).style.opacity = "1"; }}
+              >
+                Share on X
               </button>
               <button className="btn-neon" onClick={backToMenu}>
                 MENU

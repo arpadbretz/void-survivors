@@ -20,7 +20,7 @@
 - `engine.ts` — Main game loop, physics, collisions, state management
 - `renderer.ts` — Canvas 2D rendering, HUD, visual effects (neon aesthetic)
 - `enemies.ts` — Enemy spawning, AI, wave configs (9 types: chaser, shooter, swarm, tank, splitter, boss, phantom, shielder, miniboss)
-- `abilities.ts` — 12 player abilities, 7 evolutions, 7 synergies
+- `abilities.ts` — 12 player abilities, 7 evolutions, 8 synergies
 - `audio.ts` — Procedural SFX and music via Web Audio API (singleton AudioManager)
 - `particles.ts` — Object-pooled particle system
 - `types.ts` — All TypeScript interfaces (Entity, Player, Enemy, Projectile, Particle, XPOrb, Ability, GameState, etc.)
@@ -36,9 +36,17 @@
 ### React UI (`src/app/`)
 - `page.tsx` — Landing/marketing page (server component, CSS-only floating shapes)
 - `play/page.tsx` — Game client component (`"use client"`, canvas + React overlays)
-- `layout.tsx` — Root layout, metadata, PWA manifest, JSON-LD structured data
+- `layout.tsx` — Root layout, metadata, PWA manifest, JSON-LD structured data, CookieBanner
 - `globals.css` — Tailwind v4 import, CSS custom properties (neon color palette)
 - `opengraph-image.tsx` — Dynamic OG image generation
+- `components/CookieBanner.tsx` — GDPR cookie consent banner
+- `legal/` — Privacy policy, Terms of service, Impressum (with shared layout)
+
+### API Routes (`src/app/api/`)
+- `leaderboard/` — Global leaderboard (Upstash Redis)
+- `analytics/` — Custom analytics endpoint
+- `og/` — Dynamic Open Graph image
+- `share/` — Share card generation
 
 ### Game Screens (managed in play/page.tsx)
 `menu | playing | paused | upgrade | gameover | achievements | stats | shop | characters | daily | settings | leaderboard`
@@ -60,7 +68,7 @@
 - Environmental hazards: void rifts, plasma pools, gravity anomalies
 - Loot drops from bosses: health, bomb, magnet, shield
 - Endless scaling: HP/speed/spawn rate increase per wave, dual bosses at wave 20+
-- 7 ability synergies: Elemental Storm, Bullet Hell, Artillery Command, Cosmic Barrier, Rapid Fire, Death Zone, Nova Cascade
+- 8 ability synergies: Elemental Storm, Bullet Hell, Artillery Command, Cosmic Barrier, Rapid Fire, Death Zone, Nova Cascade, Temporal Surge
 - Synergy bonuses: damage_mult, cooldown_mult, range_mult, health_regen, speed_mult, xp_mult
 - Orbit shield renders visible glowing orbs with sparkle trails (renderer.ts `drawOrbitShield`)
 - Global leaderboard: all-time + daily rankings via Upstash Redis
@@ -86,7 +94,6 @@
 - DPS tracker: real-time damage per second counter on HUD
 - Damage flash: red screen edge vignette on hit, pulsing low health warning at <25% HP
 - Auto-Collect XP: toggle in settings, infinite magnet range for casual play
-- 21 game-over tips covering all v2.x features
 - Share card: canvas-generated neon stats image shared via Web Share API
 - First-run onboarding: progressive tutorial hints for new players (localStorage flag)
 - Smart PWA install prompt: shown after 2nd game over when installable
@@ -94,7 +101,11 @@
 - Evolution guide: pause screen shows ability evolution paths (ability → evolved form)
 - Kill feed: bottom-left overlay showing boss/elite kills, wave completions, evolutions
 - Accessibility: screen shake intensity slider (0-100%), colorblind mode (shape indicators), reduced motion mode
-- Upgrade reroll: 2 free rerolls per level-up on upgrade screen
+- Wave events: Swarm Rush (triple spawn, swarm-only), Tank Parade (3 tanks), Speed Frenzy (speed multiplier)
+- Run streak: tracked in GameState, persists across runs
+- Analytics: custom `/api/analytics` endpoint (Upstash Redis — DAU/WAU/game counts)
+- Legal pages: `/legal/privacy`, `/legal/terms`, `/legal/impressum` with shared layout
+- Cookie banner: GDPR consent component in root layout
 
 ## Performance Rules
 - Never use `shadowBlur` in the render loop
